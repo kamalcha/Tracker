@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { timer } from "$lib/timerState.svelte";
 	import {
 		LayoutDashboard,
 		Briefcase,
@@ -7,6 +8,9 @@
 		Settings,
 		Clock,
 		ChevronDown,
+		Play,
+		Square,
+		Calendar,
 	} from "lucide-svelte";
 	import { page } from "$app/state";
 
@@ -29,7 +33,7 @@
 				</div>
 				<span
 					class="text-xl font-black tracking-tighter text-black uppercase"
-					>Pillarr</span
+					>Pillarr Tasks</span
 				>
 			</div>
 
@@ -52,6 +56,16 @@
 
 		<nav class="flex-1 px-4 space-y-1">
 			<a
+				href="/dashboard/timer"
+				class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm {isActive(
+					'/timer',
+				)
+					? 'bg-gray-900 text-white shadow-lg shadow-gray-200'
+					: 'text-gray-500 hover:bg-gray-50'}"
+			>
+				<Clock size={18} strokeWidth={2.5} /> Timer
+			</a>
+			<a
 				href="/dashboard/reports"
 				class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm {isActive(
 					'/reports',
@@ -59,7 +73,7 @@
 					? 'bg-gray-900 text-white shadow-lg shadow-gray-200'
 					: 'text-gray-500 hover:bg-gray-50'}"
 			>
-				<LayoutDashboard size={18} /> Reports
+				<LayoutDashboard size={18} strokeWidth={2.5} /> Reports
 			</a>
 			<a
 				href="/dashboard/projects"
@@ -69,7 +83,7 @@
 					? 'bg-gray-900 text-white shadow-lg shadow-gray-200'
 					: 'text-gray-500 hover:bg-gray-50'}"
 			>
-				<Briefcase size={18} /> Projects
+				<Briefcase size={18} strokeWidth={2.5} /> Projects
 			</a>
 			<a
 				href="/dashboard/tasks"
@@ -79,7 +93,7 @@
 					? 'bg-gray-900 text-white shadow-lg shadow-gray-200'
 					: 'text-gray-500 hover:bg-gray-50'}"
 			>
-				<CheckSquare size={18} /> Tasks
+				<CheckSquare size={18} strokeWidth={2.5} /> Tasks
 			</a>
 		</nav>
 
@@ -88,14 +102,14 @@
 				href="/dashboard/profile"
 				class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 rounded-xl transition-all font-bold text-sm"
 			>
-				<Settings size={18} /> Profile
+				<Settings size={18} strokeWidth={2.5} /> Profile
 			</a>
 			<form method="POST" action="/dashboard?/logout">
 				<button
 					type="submit"
 					class="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold text-sm active:scale-95"
 				>
-					<LogOut size={18} />
+					<LogOut size={18} strokeWidth={2.5} />
 					<span>Sign out</span>
 				</button>
 			</form>
@@ -108,16 +122,40 @@
 		>
 			<h2 class="text-xl font-black text-gray-900 capitalize">
 				{page.url.pathname.split("/").pop()}
+				{#if timer.status === "working"}
+					<div class="flex items-center gap-1.5 text-emerald-500">
+						<Calendar size={10} strokeWidth={3} />
+						<span
+							class="text-[10px] font-bold uppercase tracking-widest"
+							>{timer.currentDate}</span
+						>
+					</div>
+				{/if}
 			</h2>
 
 			<div class="flex items-center gap-6">
-				<div class="text-right hidden sm:block">
-					<p
-						class="text-[10px] font-bold text-gray-400 uppercase tracking-widest"
+				<span
+					class="text-zinc-900 font-mono font-black text-lg tracking-tight w-24"
+				>
+					{timer.elapsed}
+				</span>
+				{#if timer.status === "idle"}
+					<button
+						onclick={() => timer.start()}
+						class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-100 flex items-center gap-2 active:scale-95"
 					>
-						Shift Time
-					</p>
-					<p class="text-sm font-mono font-bold text-gray-900">
+						<Play size={14} fill="currentColor" /> Clock In
+					</button>
+				{:else}
+					<button
+						onclick={() => timer.stop()}
+						class="flex items-center gap-2 bg-red-50 text-red-600 border border-red-100 px-5 py-2 rounded-xl font-bold text-sm hover:bg-red-100 transition-all active:scale-95"
+					>
+						<Square size={14} fill="currentColor" /> Clock Out
+					</button>
+				{/if}
+				<!-- <div class="text-right hidden sm:block">
+					<p class="text-xl font-mono font-bold text-gray-900">
 						04:20:15
 					</p>
 				</div>
@@ -126,11 +164,11 @@
 				>
 					<Clock size={16} />
 					Clock Out
-				</button>
+				</button> -->
 			</div>
 		</header>
 
-		<main class="flex-1 p-8 overflow-y-auto">
+		<main class="flex-1 py-8 overflow-y-auto">
 			{@render children()}
 		</main>
 	</div>

@@ -30,3 +30,14 @@ export const invitations = pgTable('invitations', {
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const timeLogs = pgTable('time_logs', {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+        .notNull()
+        .references(() => users.id),
+    date: text('date').notNull(),
+    startTime: timestamp('start_time', { withTimezone: true }).notNull(),
+    endTime: timestamp('end_time', { withTimezone: true }),
+    duration: integer('duration').default(0),
+});
