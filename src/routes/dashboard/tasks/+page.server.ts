@@ -38,7 +38,7 @@ export const actions = {
         const data = await request.formData();
         const name = data.get('name')?.toString();
         const projectId = data.get('projectId') ? Number(data.get('projectId')) : null;
-        if (!name) return fail(400, { message: 'Name is required' });
+        if (!name) return fail(400);
 
         await db.insert(tasks).values({ name, userId, projectId, status: 'Todo' });
         return { success: true };
@@ -73,6 +73,11 @@ export const actions = {
         const data = await request.formData();
         const id = Number(data.get('id'));
         const updateFields: any = {};
+
+        // Added support for renaming
+        if (data.has('name')) {
+            updateFields.name = data.get('name')?.toString();
+        }
 
         if (data.has('status')) {
             const status = data.get('status')?.toString();

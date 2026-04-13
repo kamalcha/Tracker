@@ -7,13 +7,11 @@ export const load = async ({ params, cookies }) => {
     const userId = Number(cookies.get('user_id'));
     const projectId = Number(params.id);
 
-    // Fetch the project details
     const [project] = await db.select().from(projects)
         .where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
 
     if (!project) throw redirect(302, '/dashboard/projects');
 
-    // If active, show active tasks. If archived, show its completed history.
     const projectTasks = await db.select().from(tasks)
         .where(and(
             eq(tasks.projectId, projectId),
@@ -21,7 +19,6 @@ export const load = async ({ params, cookies }) => {
         ))
         .orderBy(asc(tasks.completed), asc(tasks.id));
 
-    // Used for potential project-switching logic
     const userProjects = await db.select().from(projects).where(eq(projects.userId, userId));
 
     return {
@@ -59,6 +56,11 @@ export const actions = {
         const data = await request.formData();
         const id = Number(data.get('id'));
         const updateFields: any = {};
+
+        // Added name support for inline editing
+        if (data.has('name')) {
+            updateFields.name = data.get('name')?.toString();
+        }
 
         if (data.has('status')) {
             const status = data.get('status')?.toString();

@@ -22,7 +22,10 @@
 	// --- LOCAL REACTIVE STATE ---
 	let tasksList = $state(data.tasks);
 	let projectsList = $state(data.projects);
+	let editingTaskId = $state<number | null>(null);
+	let tempTaskName = $state("");
 
+	// Keep local state in sync with server data
 	$effect(() => {
 		tasksList = data.tasks;
 		projectsList = data.projects;
@@ -60,6 +63,13 @@
 			.filter((t) => selectedIds.includes(t.id))
 			.some((t) => t.projectIsArchived),
 	);
+
+	function startEditing(task: any) {
+		// Don't allow editing archived tasks or tasks in archived projects
+		if (isArchiveTab || task.projectIsArchived) return;
+		editingTaskId = task.id;
+		tempTaskName = task.name;
+	}
 
 	function triggerToast(message: string, ids: number[]) {
 		clearTimeout(toastTimer);
@@ -153,13 +163,19 @@
 								<form
 									action="?/updateTask"
 									method="POST"
-									use:enhance
+									use:enhance={() => {
+										task.completed = !task.completed;
+										task.status = task.completed
+											? "Done"
+											: "Todo";
+									}}
 								>
 									<input
 										type="hidden"
 										name="id"
 										value={task.id}
-									/><input
+									/>
+									<input
 										type="hidden"
 										name="status"
 										value={task.completed ? "Todo" : "Done"}
@@ -176,11 +192,44 @@
 											/>{/if}</button
 									>
 								</form>
-								<span
-									class="font-bold truncate {task.completed
-										? 'line-through text-zinc-300'
-										: 'text-zinc-900'}">{task.name}</span
-								>
+
+								{#if editingTaskId === task.id}
+									<form
+										action="?/updateTask"
+										method="POST"
+										class="flex-1"
+										use:enhance={() => {
+											task.name = tempTaskName;
+											editingTaskId = null;
+										}}
+									>
+										<input
+											type="hidden"
+											name="id"
+											value={task.id}
+										/>
+										<input
+											bind:value={tempTaskName}
+											name="name"
+											class="w-full bg-transparent font-bold text-zinc-900 outline-none border-b border-zinc-900"
+											autoFocus
+											onblur={(e) =>
+												e.currentTarget.form?.requestSubmit()}
+											onkeydown={(e) =>
+												e.key === "Escape" &&
+												(editingTaskId = null)}
+										/>
+									</form>
+								{:else}
+									<span
+										onclick={() => startEditing(task)}
+										class="font-bold truncate {task.completed
+											? 'line-through text-zinc-300'
+											: 'text-zinc-900 cursor-text hover:text-zinc-500'}"
+									>
+										{task.name}
+									</span>
+								{/if}
 							</div>
 						</td>
 
@@ -249,6 +298,7 @@
 													action="?/updateTask"
 													method="POST"
 													use:enhance={() => {
+														task.projectId = null;
 														activeProjectDropdown =
 															null;
 													}}
@@ -273,6 +323,8 @@
 														action="?/updateTask"
 														method="POST"
 														use:enhance={() => {
+															task.projectId =
+																p.id;
 															activeProjectDropdown =
 																null;
 														}}
@@ -612,7 +664,7 @@
 				/><input type="hidden" name="archive" value={isArchiveTab} />
 				<button
 					type="submit"
-					class="text-xs font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors"
+					class="text-xs font-black uppercase text-emerald-400 hover:text-emerald-300 tracking-widest transition-colors"
 					>Undo</button
 				>
 			</form>

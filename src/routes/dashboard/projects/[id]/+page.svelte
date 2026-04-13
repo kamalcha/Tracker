@@ -21,6 +21,8 @@
 
 	// --- LOCAL REACTIVE STATE ---
 	let tasksList = $state(data.tasks);
+	let editingTaskId = $state<number | null>(null);
+	let tempTaskName = $state("");
 
 	// Sync local state when page data updates (e.g., on createTask)
 	$effect(() => {
@@ -40,6 +42,13 @@
 	let toastMessage = $state("");
 	let lastActionIds = $state<number[]>([]);
 	let toastTimer: any;
+
+	function startEditing(task: any) {
+		// Prevent editing if the project is archived
+		if (isLocked) return;
+		editingTaskId = task.id;
+		tempTaskName = task.name;
+	}
 
 	function triggerToast(message: string, ids: number[]) {
 		clearTimeout(toastTimer);
@@ -200,11 +209,44 @@
 											/>{/if}
 									</button>
 								</form>
-								<span
-									class="font-bold truncate {task.completed
-										? 'line-through text-zinc-300'
-										: 'text-zinc-900'}">{task.name}</span
-								>
+
+								{#if editingTaskId === task.id}
+									<form
+										action="?/updateTask"
+										method="POST"
+										class="flex-1"
+										use:enhance={() => {
+											task.name = tempTaskName;
+											editingTaskId = null;
+										}}
+									>
+										<input
+											type="hidden"
+											name="id"
+											value={task.id}
+										/>
+										<input
+											bind:value={tempTaskName}
+											name="name"
+											class="w-full bg-transparent font-bold text-zinc-900 outline-none border-b border-zinc-900"
+											autoFocus
+											onblur={(e) =>
+												e.currentTarget.form?.requestSubmit()}
+											onkeydown={(e) =>
+												e.key === "Escape" &&
+												(editingTaskId = null)}
+										/>
+									</form>
+								{:else}
+									<span
+										onclick={() => startEditing(task)}
+										class="font-bold truncate {task.completed
+											? 'line-through text-zinc-300'
+											: 'text-zinc-900 cursor-text hover:text-zinc-500'}"
+									>
+										{task.name}
+									</span>
+								{/if}
 							</div>
 						</td>
 
