@@ -13,29 +13,23 @@
 	let currentTab = $state("Active");
 	let newProjectName = $state("");
 
-	// Filter based on tab
+	let toastVisible = $state(false);
+	let toastMessage = $state("");
+	let lastActionId = $state<number | null>(null);
+	let toastTimer: any;
+
 	let filteredProjects = $derived(
 		data.projects.filter(
 			(p) => p.isArchived === (currentTab === "Archive"),
 		),
 	);
 
-	function confirmDelete(id: number, name: string) {
-		if (
-			confirm(
-				`Are you sure? This will permanently delete "${name}" and all its tasks.`,
-			)
-		) {
-			const form = document.createElement("form");
-			form.method = "POST";
-			form.action = "?/deleteProject";
-			const input = document.createElement("input");
-			input.name = "id";
-			input.value = id.toString();
-			form.appendChild(input);
-			document.body.appendChild(form);
-			form.submit();
-		}
+	function triggerToast(message: string, id: number) {
+		clearTimeout(toastTimer);
+		toastMessage = message;
+		lastActionId = id;
+		toastVisible = true;
+		toastTimer = setTimeout(() => (toastVisible = false), 6000);
 	}
 </script>
 
@@ -43,21 +37,24 @@
 	<header class="px-8 pt-8 flex gap-8 border-b border-zinc-100 shrink-0">
 		{#each ["Active", "Archive"] as tab}
 			<button
-				onclick={() => (currentTab = tab)}
+				onclick={() => {
+					currentTab = tab;
+					toastVisible = false;
+				}}
 				class="pb-4 text-sm font-black uppercase tracking-widest border-b-2 transition-all {currentTab ===
 				tab
 					? 'border-zinc-900 text-zinc-900'
-					: 'border-transparent text-zinc-300'}"
+					: 'border-transparent text-zinc-300'}">{tab}</button
 			>
-				{tab}
-			</button>
 		{/each}
 	</header>
 
 	<div class="flex-1 overflow-auto scrollbar-thin">
 		<table class="w-full table-fixed border-separate border-spacing-0">
 			<thead>
-				<tr class="text-[10px] font-black uppercase text-zinc-400">
+				<tr
+					class="text-[10px] font-black uppercase tracking-widest text-zinc-400"
+				>
 					<th class="px-8 py-4 text-left border-b border-zinc-100"
 						>Project Name</th
 					>
@@ -97,34 +94,43 @@
 									class="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden"
 								>
 									<div
-										class="h-full bg-emerald-500 transition-all duration-500"
+										class="h-full bg-emerald-500 transition-all duration-700"
 										style="width: {progress}%"
 									></div>
 								</div>
 								<span
-									class="text-[10px] font-black uppercase tracking-widest {project.remainingTasks ===
-									0
+									class="text-[10px] font-black uppercase tracking-tighter {project.remainingTasks ===
+										0 && project.totalTasks > 0
 										? 'text-emerald-500'
 										: 'text-zinc-400'}"
 								>
-									{#if project.remainingTasks === 0 && project.totalTasks > 0}
-										All tasks complete! 🎉
-									{:else if project.totalTasks === 0}
-										No tasks yet
-									{:else}
-										{project.remainingTasks} tasks left
-									{/if}
+									{project.remainingTasks === 0 &&
+									project.totalTasks > 0
+										? "All tasks complete! 🎉"
+										: project.totalTasks === 0
+											? "No tasks yet"
+											: `${project.remainingTasks} tasks left`}
 								</span>
 							</div>
 						</td>
-						<td class="px-4 pr-8">
+						<td class="px-4 pr-8 text-right">
 							<div
 								class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
 							>
 								<form
 									action="?/archiveProject"
 									method="POST"
-									use:enhance
+									use:enhance={() => {
+										triggerToast(
+											currentTab === "Active"
+												? "Project Archived"
+												: "Project Restored",
+											project.id,
+										);
+										return async ({ update }) => {
+											await update();
+										};
+									}}
 								>
 									<input
 										type="hidden"
@@ -139,26 +145,40 @@
 									<button
 										type="submit"
 										class="p-2 text-zinc-300 hover:text-zinc-900 transition-colors"
-									>
-										{#if currentTab === "Active"}<Archive
+										>{#if currentTab === "Active"}<Archive
 												size={14}
 											/>{:else}<RotateCcw
 												size={14}
-											/>{/if}
-									</button>
+											/>{/if}</button
+									>
 								</form>
-								<button
-									onclick={() =>
-										confirmDelete(project.id, project.name)}
-									class="p-2 text-zinc-300 hover:text-red-500 transition-colors"
+								<form
+									action="?/deleteProject"
+									method="POST"
+									onsubmit={(e) => {
+										if (
+											!confirm(
+												"Permanently delete project and ALL tasks?",
+											)
+										)
+											e.preventDefault();
+									}}
 								>
-									<Trash2 size={14} />
-								</button>
+									<input
+										type="hidden"
+										name="id"
+										value={project.id}
+									/>
+									<button
+										type="submit"
+										class="p-2 text-zinc-300 hover:text-red-500 transition-colors"
+										><Trash2 size={14} /></button
+									>
+								</form>
 							</div>
 						</td>
 					</tr>
 				{/each}
-
 				{#if currentTab === "Active"}
 					<tr class="bg-zinc-50/10">
 						<td colspan="3" class="px-8">
@@ -185,4 +205,39 @@
 			</tbody>
 		</table>
 	</div>
+
+	{#if toastVisible}
+		<div
+			class="fixed bottom-12 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-6 z-50 animate-in fade-in slide-in-from-bottom-2"
+		>
+			<span class="text-sm font-bold">{toastMessage}</span>
+			<div class="h-4 w-px bg-zinc-700"></div>
+			<form
+				action="?/archiveProject"
+				method="POST"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						toastVisible = false;
+					};
+				}}
+			>
+				<input type="hidden" name="id" value={lastActionId} />
+				<input
+					type="hidden"
+					name="archive"
+					value={currentTab === "Archive"}
+				/>
+				<button
+					type="submit"
+					class="text-xs font-black uppercase text-emerald-400 hover:text-emerald-300 tracking-widest"
+					>Undo</button
+				>
+			</form>
+			<button
+				onclick={() => (toastVisible = false)}
+				class="text-zinc-500 hover:text-white"><X size={14} /></button
+			>
+		</div>
+	{/if}
 </div>
