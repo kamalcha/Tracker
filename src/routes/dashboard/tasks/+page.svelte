@@ -4,47 +4,54 @@
 		CircleCheck,
 		CircleAlert,
 		Loader,
-		Ellipsis,
 		Briefcase,
 		Plus,
 		Trash2,
-		Copy,
 		Archive,
+		ChevronDown,
+		Search,
+		RotateCcw,
+		X,
+		Check,
 	} from "lucide-svelte";
+	import { enhance } from "$app/forms";
 
-	// Define your static data in an array
-	let tasks = $state([
-		{
-			id: 1,
-			name: "Task 1",
-			project: "None",
-			status: "Todo",
-			completed: false,
-		},
-		{
-			id: 2,
-			name: "Task 2",
-			project: "Redesign",
-			status: "In Progress",
-			completed: false,
-		},
-		{
-			id: 3,
-			name: "Task 3",
-			project: "Development",
-			status: "Blocked",
-			completed: false,
-		},
-		{
-			id: 4,
-			name: "Task 4",
-			project: "None",
-			status: "Done",
-			completed: true,
-		},
-	]);
+	let { data } = $props();
 
-	// Helper to get the correct icon/color based on status string
+	// --- STATE ---
+	let currentTab = $state("Inbox");
+	let selectedIds = $state<number[]>([]);
+	let activeProjectDropdown = $state<number | null>(null);
+	let activeStatusDropdown = $state<number | null>(null);
+	let projectSearch = $state("");
+	let newProjectName = $state("");
+	let newTaskName = $state("");
+
+	// --- TOAST STATE ---
+	let toastVisible = $state(false);
+	let toastMessage = $state("");
+	let lastActionIds = $state<number[]>([]);
+	let toastTimer: any;
+
+	// --- DERIVED ---
+	let filteredTasks = $derived(
+		data.tasks.filter((t) => t.isArchived === (currentTab === "Archive")),
+	);
+	let filteredProjects = $derived(
+		data.projects.filter((p) =>
+			p.name.toLowerCase().includes(projectSearch.toLowerCase()),
+		),
+	);
+
+	// --- TOAST TRIGGER ---
+	function triggerToast(message: string, ids: number[]) {
+		clearTimeout(toastTimer);
+		toastMessage = message;
+		lastActionIds = ids;
+		toastVisible = true;
+		toastTimer = setTimeout(() => (toastVisible = false), 6000);
+	}
+
 	const getStatusDetails = (status: string) => {
 		switch (status) {
 			case "In Progress":
@@ -59,143 +66,542 @@
 	};
 </script>
 
-<div class="scrollbar-thin overflow-auto min-h-0 min-w-0 overscroll-none">
-	<table class="w-full caption-bottom text-p1 min-w-0 table-fixed">
-		<thead
-			class="[&_tr]:border-b **:data-selection-checkbox:pr-0 **:data-selection-checkbox:aria-[checked=false]:border-primary-interactive"
-		>
-			<tr
-				class="group relative border-b border-primary bg-primary-interactive **:[td]:bg-primary-interactive-group aria-selected:border-accent aria-selected:bg-muted! aria-selected:**:[td]:bg-muted! group/table-headers hover:bg-inherit"
+<div class="flex flex-col h-screen bg-white overflow-hidden">
+	<header class="px-8 pt-8 flex gap-8 border-b border-zinc-100 shrink-0">
+		{#each ["Inbox", "Archive"] as tab}
+			<button
+				onclick={() => {
+					currentTab = tab;
+					selectedIds = [];
+				}}
+				class="pb-4 text-sm font-black uppercase tracking-widest border-b-2 transition-all {currentTab ===
+				tab
+					? 'border-zinc-900 text-zinc-900'
+					: 'border-transparent text-zinc-300 hover:text-zinc-500'}"
 			>
-				<th
-					class="h-12 px-3 text-left align-middle text-h6 font-semibold text-secondary uppercase text-nowrap sticky bg-primary top-0 z-4 before:rounded-t w-0"
-				>
-					<input type="checkbox" /></th
-				>
-				<th
-					class="h-12 px-3 text-left align-middle text-h6 font-semibold text-secondary uppercase text-nowrap sticky bg-primary top-0 z-4 before:rounded-t after:pointer-events-none after:absolute after:inset-y-0 after:w-1.25 after:from-black/4 dark:after:from-black/20 after:to-transparent after:border-inverted/10"
-					>Task</th
-				>
-				<th
-					class="h-12 px-3 text-left align-middle text-h6 font-semibold text-secondary uppercase text-nowrap sticky bg-primary top-0 z-2 before:rounded-t cursor-grab active:cursor-grabbing"
-					>Projects</th
-				>
-				<th
-					class="h-12 px-3 text-left align-middle text-h6 font-semibold text-secondary uppercase text-nowrap sticky bg-primary top-0 z-2 before:rounded-t cursor-grab active:cursor-grabbing"
-					>Status</th
-				>
-				<th
-					class="h-12 px-3 text-left align-middle text-h6 font-semibold text-secondary uppercase text-nowrap sticky bg-primary top-0 z-4 before:rounded-t"
-					>Actions</th
-				>
-			</tr>
-		</thead>
-		<tbody class="[&_tr:last-child]:border-0">
-			{#each tasks as task (task.id)}
-				{@const details = getStatusDetails(task.status)}
-				<tr
-					class="group relative border-b border-primary bg-primary-interactive group/row"
-				>
-					<td class="h-12 px-3 align-middle sticky bg-primary z-3">
-						<input type="checkbox" />
-					</td>
+				{tab}
+			</button>
+		{/each}
+	</header>
 
-					<td class="h-12 px-3 align-middle sticky bg-primary z-3">
-						<div class="flex items-center gap-2">
-							<label
-								class="relative flex items-center cursor-pointer"
+	<div class="flex-1 overflow-auto scrollbar-thin">
+		<table class="w-full table-fixed border-separate border-spacing-0">
+			<thead class="sticky top-0 bg-white z-20">
+				<tr
+					class="text-[10px] font-black uppercase tracking-widest text-zinc-400"
+				>
+					<th
+						class="w-16 py-4 px-6 text-left border-b border-zinc-100"
+					>
+						<input
+							type="checkbox"
+							checked={selectedIds.length > 0 &&
+								selectedIds.length === filteredTasks.length}
+							onchange={() =>
+								(selectedIds = selectedIds.length
+									? []
+									: filteredTasks.map((t) => t.id))}
+							class="rounded border-zinc-300 accent-zinc-900"
+						/>
+					</th>
+					<th class="px-4 text-left border-b border-zinc-100">Task</th
+					>
+					<th class="w-48 px-4 text-left border-b border-zinc-100"
+						>Project</th
+					>
+					<th class="w-40 px-4 text-left border-b border-zinc-100"
+						>Status</th
+					>
+					<th
+						class="w-28 px-4 text-left border-b border-zinc-100 text-right pr-8"
+						>Actions</th
+					>
+				</tr>
+			</thead>
+			<tbody class="divide-y divide-zinc-50">
+				{#each filteredTasks as task (task.id)}
+					{@const details = getStatusDetails(task.status)}
+					<tr class="group hover:bg-zinc-50/50 transition-colors">
+						<td class="py-4 px-6"
+							><input
+								type="checkbox"
+								bind:group={selectedIds}
+								value={task.id}
+								class="rounded border-zinc-300 accent-zinc-900"
+							/></td
+						>
+						<td class="px-4">
+							<div class="flex items-center gap-3">
+								<form
+									action="?/updateTask"
+									method="POST"
+									use:enhance
+								>
+									<input
+										type="hidden"
+										name="id"
+										value={task.id}
+									/>
+									<input
+										type="hidden"
+										name="status"
+										value={task.completed ? "Todo" : "Done"}
+									/>
+									<button
+										type="submit"
+										class="size-5 rounded-md border-2 transition-all {task.completed
+											? 'bg-emerald-500 border-emerald-500 text-white'
+											: 'border-zinc-200'} flex items-center justify-center shrink-0"
+									>
+										{#if task.completed}<Check
+												size={14}
+												strokeWidth={4}
+											/>{/if}
+									</button>
+								</form>
+								<span
+									class="font-bold truncate {task.completed
+										? 'line-through text-zinc-300'
+										: 'text-zinc-900'}">{task.name}</span
+								>
+							</div>
+						</td>
+
+						<td class="px-4">
+							<div class="relative">
+								<button
+									onclick={() => {
+										activeProjectDropdown =
+											activeProjectDropdown === task.id
+												? null
+												: task.id;
+										projectSearch = "";
+										newProjectName = "";
+									}}
+									class="w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-full border border-zinc-100 text-[10px] font-black uppercase text-zinc-500 hover:border-zinc-900 transition-all"
+								>
+									<div
+										class="flex items-center gap-1.5 truncate"
+									>
+										<!-- <Briefcase size={10} /> -->
+										{data.projects.find(
+											(p) => p.id === task.projectId,
+										)?.name || "None"}
+									</div>
+									<ChevronDown size={10} class="shrink-0" />
+								</button>
+
+								{#if activeProjectDropdown === task.id}
+									<div
+										class="absolute left-0 top-full mt-2 w-64 bg-white border border-zinc-100 shadow-2xl rounded-2xl z-50 flex flex-col max-h-[420px] overflow-hidden"
+									>
+										<div
+											class="p-2 border-b border-zinc-50 bg-zinc-50/50"
+										>
+											<div
+												class="flex items-center gap-2 px-2 py-1.5 bg-white border border-zinc-200 rounded-lg"
+											>
+												<Search
+													size={12}
+													class="text-zinc-400"
+												/>
+												<input
+													type="text"
+													bind:value={projectSearch}
+													placeholder="Filter projects..."
+													class="bg-transparent text-xs outline-none w-full font-bold"
+												/>
+											</div>
+										</div>
+										<form
+											action="?/updateTask"
+											method="POST"
+											use:enhance={() => {
+												return async ({ update }) => {
+													await update();
+													activeProjectDropdown =
+														null;
+												};
+											}}
+										>
+											<input
+												type="hidden"
+												name="id"
+												value={task.id}
+											/>
+											<input
+												type="hidden"
+												name="projectId"
+												value=""
+											/>
+											<button
+												type="submit"
+												class="w-full text-left px-4 py-2.5 text-xs font-black uppercase tracking-tighter hover:bg-zinc-50 border-b border-zinc-50 text-zinc-400 hover:text-zinc-900 transition-colors"
+												>None</button
+											>
+										</form>
+										<div
+											class="flex-1 overflow-y-auto py-1 scrollbar-thin max-h-[220px]"
+										>
+											{#each filteredProjects as p}
+												<form
+													action="?/updateTask"
+													method="POST"
+													use:enhance={() => {
+														return async ({
+															update,
+														}) => {
+															await update();
+															activeProjectDropdown =
+																null;
+														};
+													}}
+												>
+													<input
+														type="hidden"
+														name="id"
+														value={task.id}
+													/>
+													<input
+														type="hidden"
+														name="projectId"
+														value={p.id}
+													/>
+													<button
+														type="submit"
+														class="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-zinc-50 truncate transition-colors"
+														>{p.name}</button
+													>
+												</form>
+											{/each}
+										</div>
+										<div
+											class="p-2 border-t border-zinc-100 bg-zinc-50/50"
+										>
+											<form
+												action="?/createAndAssignProject"
+												method="POST"
+												use:enhance={() => {
+													return async ({
+														update,
+													}) => {
+														await update();
+														activeProjectDropdown =
+															null;
+														newProjectName = "";
+													};
+												}}
+											>
+												<input
+													type="hidden"
+													name="taskId"
+													value={task.id}
+												/>
+												<div
+													class="flex items-center gap-2 px-2 py-1.5 bg-white border border-dashed border-zinc-300 rounded-lg focus-within:border-zinc-900 transition-all"
+												>
+													<Plus
+														size={12}
+														class="text-zinc-400"
+													/>
+													<input
+														type="text"
+														name="name"
+														bind:value={
+															newProjectName
+														}
+														placeholder="New Project..."
+														class="bg-transparent text-xs outline-none w-full font-bold"
+													/>
+												</div>
+											</form>
+										</div>
+									</div>
+								{/if}
+							</div>
+						</td>
+
+						<td class="px-4">
+							<div class="relative">
+								<button
+									onclick={() =>
+										(activeStatusDropdown =
+											activeStatusDropdown === task.id
+												? null
+												: task.id)}
+									class="flex items-center gap-2 text-xs font-bold {details.color} hover:opacity-70 transition-all"
+								>
+									<details.icon size={14} strokeWidth={2.5} />
+									{task.status}
+									<ChevronDown size={12} />
+								</button>
+								{#if activeStatusDropdown === task.id}
+									<div
+										class="absolute left-0 top-full mt-2 w-40 bg-white border border-zinc-100 shadow-2xl rounded-xl z-50 p-1"
+									>
+										{#each ["Todo", "In Progress", "Blocked", "Done"] as s}
+											<form
+												action="?/updateTask"
+												method="POST"
+												use:enhance={() => {
+													return async ({
+														update,
+													}) => {
+														await update();
+														activeStatusDropdown =
+															null;
+													};
+												}}
+											>
+												<input
+													type="hidden"
+													name="id"
+													value={task.id}
+												/>
+												<input
+													type="hidden"
+													name="status"
+													value={s}
+												/>
+												<button
+													type="submit"
+													class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-lg hover:bg-zinc-50 transition-colors"
+													>{s}</button
+												>
+											</form>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						</td>
+
+						<td class="px-4 pr-8">
+							<div
+								class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+							>
+								<form
+									action="?/archiveTasks"
+									method="POST"
+									use:enhance={() => {
+										const ids = [task.id];
+										const msg =
+											currentTab === "Inbox"
+												? `Task Archived`
+												: `Task Restored`;
+										triggerToast(msg, ids);
+										return async ({ update }) => {
+											await update();
+										};
+									}}
+								>
+									<input
+										type="hidden"
+										name="ids"
+										value={JSON.stringify([task.id])}
+									/>
+									<input
+										type="hidden"
+										name="archive"
+										value={currentTab === "Inbox"}
+									/>
+									<button
+										type="submit"
+										class="p-2 text-zinc-300 hover:text-zinc-900 transition-colors"
+									>
+										{#if currentTab === "Inbox"}<Archive
+												size={14}
+											/>{:else}<RotateCcw
+												size={14}
+											/>{/if}
+									</button>
+								</form>
+
+								<form
+									action="?/deleteTasks"
+									method="POST"
+									use:enhance={() => {
+										triggerToast(
+											`Task Permanently Deleted`,
+											[],
+										);
+										return async ({ update }) => {
+											await update();
+										};
+									}}
+								>
+									<input
+										type="hidden"
+										name="ids"
+										value={JSON.stringify([task.id])}
+									/>
+									<button
+										type="submit"
+										class="p-2 text-zinc-300 hover:text-red-500 transition-colors"
+									>
+										<Trash2 size={14} />
+									</button>
+								</form>
+							</div>
+						</td>
+					</tr>
+				{/each}
+
+				{#if currentTab === "Inbox"}
+					<tr class="bg-zinc-50/10">
+						<td class="py-4 px-6"></td>
+						<td colspan="4" class="px-4">
+							<form
+								action="?/createTask"
+								method="POST"
+								use:enhance={() => {
+									return async ({ update }) => {
+										await update();
+										newTaskName = "";
+									};
+								}}
 							>
 								<input
-									type="checkbox"
-									bind:checked={task.completed}
-									class="sr-only peer"
+									bind:value={newTaskName}
+									name="name"
+									placeholder="Quick add task... (Enter)"
+									class="w-full bg-transparent font-bold outline-none placeholder:text-zinc-200"
 								/>
-								<div
-									class="size-4 rounded-full border border-zinc-500 flex items-center justify-center peer-checked:bg-zinc-500"
-								>
-									{#if task.completed}
-										<svg
-											class="size-2 text-white"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="3"
-											><polyline points="20 6 9 17 4 12"
-											></polyline></svg
-										>
-									{/if}
-								</div>
-							</label>
-							<button
-								type="button"
-								onclick={() =>
-									console.log("Open drawer for:", task.name)}
-								class="text-left hover:underline transition-all duration-300 {task.completed
-									? 'line-through'
-									: 'text-primary'}"
-							>
-								{task.name}
-							</button>
-						</div>
-					</td>
-
-					<td class="relative h-12 px-3 align-middle">
-						<div class="flex items-center gap-2">
-							<Briefcase
-								size={18}
-								strokeWidth={2}
-								class="text-zinc-800"
-							/>
-							<span class="truncate">{task.project}</span>
-						</div>
-					</td>
-
-					<td class="relative h-12 px-3 align-middle">
-						<div
-							class="flex gap-x-2 font-semibold text-primary items-center"
-						>
-							<span
-								><details.icon
-									size={18}
-									strokeWidth={2.5}
-									class={details.color}
-								/></span
-							>
-							{task.status}
-						</div>
-					</td>
-
-					<td class="relative h-12 px-3 align-middle">
-						<div class="flex items-center gap-2">
-							<button
-								class="rounded-full p-1.5 transition-all duration-200 hover:bg-slate-100"
-							>
-								<Trash2 size={16} strokeWidth={2.5} />
-							</button>
-							<button
-								class="rounded-full p-1.5 transition-all duration-200 hover:bg-slate-100"
-							>
-								<Copy size={16} strokeWidth={2.5} />
-							</button>
-							<button
-								class="rounded-full p-1.5 transition-all duration-200 hover:bg-slate-100"
-							>
-								<Archive size={16} strokeWidth={2.5} />
-							</button>
-						</div>
-					</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-</div>
-<div
-	class="sticky bottom-0 left-0 z-10 border-t border-primary bg-primary dark:bg-secondary/50 dark:backdrop-blur-lg px-3"
->
-	<div class="flex items-center gap-2 min-h-12 pl-12">
-		<button class="flex items-center gap-2">
-			<Plus size={18} strokeWidth={2.5} />
-			Add Task
-		</button>
+							</form>
+						</td>
+					</tr>
+				{/if}
+			</tbody>
+		</table>
 	</div>
+
+	{#if toastVisible}
+		<div
+			class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-6 z-[60] animate-in fade-in slide-in-from-bottom-2 duration-300"
+		>
+			<span class="text-sm font-bold">{toastMessage}</span>
+			<div class="h-4 w-px bg-zinc-700"></div>
+			<form
+				action="?/archiveTasks"
+				method="POST"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						toastVisible = false;
+					};
+				}}
+			>
+				<input
+					type="hidden"
+					name="ids"
+					value={JSON.stringify(lastActionIds)}
+				/>
+				<input
+					type="hidden"
+					name="archive"
+					value={currentTab === "Archive"}
+				/>
+				<button
+					type="submit"
+					class="text-xs font-black uppercase text-emerald-400 hover:text-emerald-300 tracking-widest transition-colors"
+					>Undo Action</button
+				>
+			</form>
+			<button
+				onclick={() => (toastVisible = false)}
+				class="text-zinc-500 hover:text-white transition-colors"
+				><X size={14} /></button
+			>
+		</div>
+	{/if}
+
+	{#if selectedIds.length > 0}
+		<div
+			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-2xl flex items-center gap-6 z-50 shadow-2xl animate-in slide-in-from-bottom-4 duration-300"
+		>
+			<span
+				class="text-[10px] font-black uppercase tracking-widest border-r border-zinc-700 pr-6 text-zinc-400"
+				>{selectedIds.length} Selected</span
+			>
+			<div class="flex items-center gap-8">
+				<form
+					action="?/archiveTasks"
+					method="POST"
+					use:enhance={() => {
+						const ids = [...selectedIds];
+						const msg =
+							currentTab === "Inbox"
+								? `${ids.length} Tasks Archived`
+								: `${ids.length} Tasks Restored`;
+						triggerToast(msg, ids);
+						selectedIds = [];
+						return async ({ update }) => {
+							await update();
+						};
+					}}
+				>
+					<input
+						type="hidden"
+						name="ids"
+						value={JSON.stringify(selectedIds)}
+					/>
+					<input
+						type="hidden"
+						name="archive"
+						value={currentTab === "Inbox"}
+					/>
+					<button
+						type="submit"
+						class="text-xs font-black uppercase tracking-widest flex items-center gap-2.5 hover:text-emerald-400 transition-colors"
+					>
+						{#if currentTab === "Inbox"}<Archive size={14} /> Archive{:else}<RotateCcw
+								size={14}
+							/> Restore{/if}
+					</button>
+				</form>
+				<form
+					action="?/deleteTasks"
+					method="POST"
+					use:enhance={() => {
+						const ids = [...selectedIds];
+						triggerToast(
+							`${ids.length} Tasks Permanently Deleted`,
+							[],
+						);
+						selectedIds = [];
+						return async ({ update }) => {
+							await update();
+						};
+					}}
+				>
+					<input
+						type="hidden"
+						name="ids"
+						value={JSON.stringify(selectedIds)}
+					/>
+					<button
+						type="submit"
+						class="text-xs font-black uppercase tracking-widest flex items-center gap-2.5 hover:text-red-400 transition-colors"
+					>
+						<Trash2 size={14} /> Delete
+					</button>
+				</form>
+			</div>
+			<button
+				onclick={() => (selectedIds = [])}
+				class="ml-2 p-1 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
+			>
+				<X size={14} />
+			</button>
+		</div>
+	{/if}
 </div>
+
+<style>
+	:global(.scrollbar-thin::-webkit-scrollbar) {
+		width: 5px;
+	}
+	:global(.scrollbar-thin::-webkit-scrollbar-thumb) {
+		background: #e4e4e7;
+		border-radius: 10px;
+	}
+</style>

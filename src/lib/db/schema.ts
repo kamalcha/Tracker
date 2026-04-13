@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, unique } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, unique, boolean } from 'drizzle-orm/pg-core';
 
 export const organizations = pgTable('organizations', {
     id: serial('id').primaryKey(),
@@ -54,3 +54,26 @@ export const dailySummaries = pgTable('daily_summaries', {
     // Ensures only one summary record exists per user per day
     unq: unique().on(t.userId, t.date),
 }));
+
+export const projects = pgTable('projects', {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    userId: integer('user_id')
+        .notNull()
+        .references(() => users.id),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const tasks = pgTable('tasks', {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    userId: integer('user_id')
+        .notNull()
+        .references(() => users.id),
+    projectId: integer('project_id')
+        .references(() => projects.id),
+    status: text('status').default('Todo').notNull(),
+    completed: boolean('completed').default(false).notNull(),
+    isArchived: boolean('is_archived').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+});
