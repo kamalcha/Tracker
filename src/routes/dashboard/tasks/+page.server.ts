@@ -1,3 +1,4 @@
+// src/routes/dashboard/tasks/+page.server.ts
 import { db } from '$lib/db';
 import { tasks, projects } from '$lib/db/schema';
 import { eq, and, asc, sql, inArray } from 'drizzle-orm';
@@ -37,7 +38,7 @@ export const actions = {
         const data = await request.formData();
         const name = data.get('name')?.toString();
         const projectId = data.get('projectId') ? Number(data.get('projectId')) : null;
-        if (!name) return fail(400);
+        if (!name) return fail(400, { message: 'Name is required' });
 
         await db.insert(tasks).values({ name, userId, projectId, status: 'Todo' });
         return { success: true };
@@ -51,19 +52,16 @@ export const actions = {
 
         if (!name) return fail(400);
 
-        // 1. Create the new project
         const [newProject] = await db.insert(projects)
             .values({ name, userId, isArchived: false })
             .returning();
 
-        // 2. Automatically assign it to the task
         if (taskId) {
             await db.update(tasks)
                 .set({ projectId: newProject.id })
                 .where(eq(tasks.id, taskId));
         }
 
-        // 3. Return the new data for the no-refresh update
         return {
             success: true,
             newProject,
@@ -87,7 +85,9 @@ export const actions = {
             updateFields.projectId = (val === "" || val === null) ? null : Number(val);
         }
 
-        await db.update(tasks).set(updateFields).where(eq(tasks.id, id));
+        if (Object.keys(updateFields).length > 0) {
+            await db.update(tasks).set(updateFields).where(eq(tasks.id, id));
+        }
         return { success: true };
     },
 
@@ -95,6 +95,7 @@ export const actions = {
         const data = await request.formData();
         const ids = JSON.parse(data.get('ids') as string).map(Number);
         const archive = data.get('archive') === 'true';
+        if (ids.length === 0) return { success: true };
         await db.update(tasks).set({ isArchived: archive }).where(inArray(tasks.id, ids));
         return { success: true };
     },
@@ -102,6 +103,7 @@ export const actions = {
     deleteTasks: async ({ request }) => {
         const data = await request.formData();
         const ids = JSON.parse(data.get('ids') as string).map(Number);
+        if (ids.length === 0) return { success: true };
         await db.delete(tasks).where(inArray(tasks.id, ids));
         return { success: true };
     }

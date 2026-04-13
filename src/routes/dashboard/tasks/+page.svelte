@@ -19,7 +19,15 @@
 
 	let { data } = $props();
 
-	// --- STATE ---
+	// --- LOCAL REACTIVE STATE ---
+	let tasksList = $state(data.tasks);
+	let projectsList = $state(data.projects);
+
+	$effect(() => {
+		tasksList = data.tasks;
+		projectsList = data.projects;
+	});
+
 	let currentTab = $state("Inbox");
 	let selectedIds = $state<number[]>([]);
 	let activeProjectDropdown = $state<number | null>(null);
@@ -37,21 +45,18 @@
 	// --- DERIVED ---
 	let isArchiveTab = $derived(currentTab === "Archive");
 	let filteredTasks = $derived(
-		data.tasks.filter((t) => t.isArchived === isArchiveTab),
+		tasksList.filter((t) => t.isArchived === isArchiveTab),
 	);
-
-	// Only show ACTIVE projects in the dropdown
 	let activeProjects = $derived(
-		data.projects.filter(
+		projectsList.filter(
 			(p) =>
 				!p.isArchived &&
 				p.name.toLowerCase().includes(projectSearch.toLowerCase()),
 		),
 	);
 
-	// Check if any selected task belongs to an archived project
 	let hasRestrictedSelection = $derived(
-		data.tasks
+		tasksList
 			.filter((t) => selectedIds.includes(t.id))
 			.some((t) => t.projectIsArchived),
 	);
@@ -162,7 +167,7 @@
 									<button
 										type="submit"
 										disabled={isArchiveTab}
-										class="size-5 rounded-md border-2 {task.completed
+										class="size-5 rounded-md border-2 transition-all {task.completed
 											? 'bg-emerald-500 border-emerald-500 text-white'
 											: 'border-zinc-200'} flex items-center justify-center shrink-0 disabled:opacity-50"
 										>{#if task.completed}<Check
@@ -187,7 +192,9 @@
 										: 'text-zinc-300'}"
 								>
 									<Briefcase size={10} />
-									{task.projectName || "None"}
+									{projectsList.find(
+										(p) => p.id === task.projectId,
+									)?.name || "None"}
 									{#if task.projectIsArchived}<Lock
 											size={10}
 											class="ml-1"
@@ -202,16 +209,22 @@
 												task.id
 													? null
 													: task.id)}
-										class="w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-full border border-zinc-100 text-[10px] font-black uppercase text-zinc-500 hover:border-zinc-900"
+										class="w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-full border border-zinc-100 text-[10px] font-black uppercase text-zinc-500 hover:border-zinc-900 transition-all"
 									>
 										<div
 											class="flex items-center gap-1.5 truncate"
 										>
 											<Briefcase size={10} />
-											{task.projectName || "None"}
+											{projectsList.find(
+												(p) => p.id === task.projectId,
+											)?.name || "None"}
 										</div>
-										<ChevronDown size={10} />
+										<ChevronDown
+											size={10}
+											class="shrink-0"
+										/>
 									</button>
+
 									{#if activeProjectDropdown === task.id}
 										<div
 											class="absolute left-0 top-full mt-2 w-56 bg-white border border-zinc-100 shadow-2xl rounded-2xl z-50 overflow-hidden"
@@ -232,6 +245,29 @@
 											<div
 												class="max-h-48 overflow-auto py-1 scrollbar-thin"
 											>
+												<form
+													action="?/updateTask"
+													method="POST"
+													use:enhance={() => {
+														activeProjectDropdown =
+															null;
+													}}
+												>
+													<input
+														type="hidden"
+														name="id"
+														value={task.id}
+													/><input
+														type="hidden"
+														name="projectId"
+														value=""
+													/>
+													<button
+														type="submit"
+														class="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-zinc-50 transition-colors text-zinc-400 italic"
+														>Unassign Project</button
+													>
+												</form>
 												{#each activeProjects as p}
 													<form
 														action="?/updateTask"
@@ -267,21 +303,44 @@
 													use:enhance={() => {
 														return async ({
 															result,
-															update,
 														}) => {
 															if (
 																result.type ===
-																"success"
+																	"success" &&
+																result.data
 															) {
+																const {
+																	newProject,
+																	taskId,
+																} =
+																	result.data as any;
+																projectsList = [
+																	...projectsList,
+																	newProject,
+																];
+																const t =
+																	tasksList.find(
+																		(x) =>
+																			x.id ===
+																			taskId,
+																	);
+																if (t) {
+																	t.projectId =
+																		newProject.id;
+																}
 																newProjectName =
 																	"";
 																activeProjectDropdown =
 																	null;
-																await update();
 															}
 														};
 													}}
 												>
+													<input
+														type="hidden"
+														name="taskId"
+														value={task.id}
+													/>
 													<div
 														class="flex items-center gap-2 px-2 py-1 bg-white rounded-lg border border-zinc-200"
 													>
@@ -354,7 +413,7 @@
 													/>
 													<button
 														type="submit"
-														class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-lg hover:bg-zinc-50"
+														class="w-full text-left px-3 py-2.5 text-xs font-bold rounded-lg hover:bg-zinc-50 transition-colors"
 														>{s}</button
 													>
 												</form>
@@ -393,7 +452,7 @@
 										/>
 										<button
 											type="submit"
-											class="p-2 text-zinc-300 hover:text-zinc-900"
+											class="p-2 text-zinc-300 hover:text-zinc-900 transition-colors"
 											>{#if isArchiveTab}<RotateCcw
 													size={14}
 												/>{:else}<Archive
@@ -423,7 +482,7 @@
 									/>
 									<button
 										type="submit"
-										class="p-2 text-zinc-300 hover:text-red-500"
+										class="p-2 text-zinc-300 hover:text-red-500 transition-colors"
 										><Trash2 size={14} /></button
 									>
 								</form>
@@ -431,6 +490,7 @@
 						</td>
 					</tr>
 				{/each}
+
 				{#if !isArchiveTab}
 					<tr class="bg-zinc-50/10"
 						><td class="py-4 px-6"></td><td colspan="4" class="px-4"
@@ -460,7 +520,7 @@
 
 	{#if selectedIds.length > 0}
 		<div
-			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-2xl flex items-center gap-6 z-50 shadow-2xl animate-in slide-in-from-bottom-4"
+			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-2xl flex items-center gap-6 z-50 shadow-2xl animate-in slide-in-from-bottom-4 transition-all"
 		>
 			<div class="flex flex-col border-r border-zinc-700 pr-6">
 				<span
@@ -469,7 +529,7 @@
 				>
 				{#if isArchiveTab && hasRestrictedSelection}
 					<span
-						class="text-[8px] font-black uppercase text-amber-500 leading-none mt-1 italic"
+						class="text-[8px] font-black uppercase text-amber-500 leading-none mt-1"
 						>Project Archived</span
 					>
 				{/if}
@@ -497,7 +557,7 @@
 					<button
 						type="submit"
 						disabled={isArchiveTab && hasRestrictedSelection}
-						class="text-xs font-black uppercase tracking-widest flex items-center gap-2.5 hover:text-emerald-400 disabled:opacity-20 transition-all"
+						class="text-xs font-black uppercase tracking-widest flex items-center gap-2.5 hover:text-emerald-400 disabled:opacity-20 transition-colors"
 					>
 						{#if isArchiveTab}<RotateCcw size={14} /> Restore{:else}<Archive
 								size={14}
@@ -519,7 +579,7 @@
 					/>
 					<button
 						type="submit"
-						class="text-xs font-black uppercase tracking-widest flex items-center gap-2.5 hover:text-red-400"
+						class="text-xs font-black uppercase tracking-widest flex items-center gap-2.5 hover:text-red-400 transition-colors"
 						><Trash2 size={14} /> Delete</button
 					>
 				</form>
@@ -534,7 +594,7 @@
 
 	{#if toastVisible}
 		<div
-			class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-6 z-[60] animate-in fade-in slide-in-from-bottom-2"
+			class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-6 z-[60] animate-in fade-in slide-in-from-bottom-2 duration-300"
 		>
 			<span class="text-sm font-bold">{toastMessage}</span>
 			<div class="h-4 w-px bg-zinc-700"></div>
@@ -552,7 +612,7 @@
 				/><input type="hidden" name="archive" value={isArchiveTab} />
 				<button
 					type="submit"
-					class="text-xs font-black uppercase text-emerald-400 hover:text-emerald-300 tracking-widest"
+					class="text-xs font-black uppercase text-emerald-400 hover:text-emerald-300 transition-colors"
 					>Undo</button
 				>
 			</form>
