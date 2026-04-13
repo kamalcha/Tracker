@@ -61,6 +61,7 @@ export const projects = pgTable('projects', {
     userId: integer('user_id')
         .notNull()
         .references(() => users.id),
+    isArchived: boolean('is_archived').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
