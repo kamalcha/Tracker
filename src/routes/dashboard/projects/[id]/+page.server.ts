@@ -21,7 +21,7 @@ export const load = async ({ params, cookies }) => {
         ))
         .orderBy(asc(tasks.completed), asc(tasks.id));
 
-    // Used for potential project-switching logic (though mostly read-only here)
+    // Used for potential project-switching logic
     const userProjects = await db.select().from(projects).where(eq(projects.userId, userId));
 
     return {

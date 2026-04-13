@@ -19,6 +19,14 @@
 
 	let { data } = $props();
 
+	// --- LOCAL REACTIVE STATE ---
+	let tasksList = $state(data.tasks);
+
+	// Sync local state when page data updates (e.g., on createTask)
+	$effect(() => {
+		tasksList = data.tasks;
+	});
+
 	// State management
 	const isLocked = $derived(data.project.isArchived);
 	let isEditingHeader = $state(false);
@@ -122,11 +130,11 @@
 							type="checkbox"
 							disabled={isLocked}
 							checked={selectedIds.length > 0 &&
-								selectedIds.length === data.tasks.length}
+								selectedIds.length === tasksList.length}
 							onchange={() =>
 								(selectedIds = selectedIds.length
 									? []
-									: data.tasks.map((t) => t.id))}
+									: tasksList.map((t) => t.id))}
 							class="rounded accent-zinc-900"
 						/>
 					</th>
@@ -144,7 +152,7 @@
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-zinc-50">
-				{#each data.tasks as task (task.id)}
+				{#each tasksList as task (task.id)}
 					{@const details = getStatusDetails(task.status)}
 					<tr class="group hover:bg-zinc-50/50 transition-colors">
 						<td class="py-4 px-6">
@@ -162,7 +170,12 @@
 								<form
 									action="?/updateTask"
 									method="POST"
-									use:enhance
+									use:enhance={() => {
+										task.completed = !task.completed;
+										task.status = task.completed
+											? "Done"
+											: "Todo";
+									}}
 								>
 									<input
 										type="hidden"
@@ -237,6 +250,9 @@
 													action="?/updateTask"
 													method="POST"
 													use:enhance={() => {
+														task.status = s;
+														task.completed =
+															s === "Done";
 														activeStatusDropdown =
 															null;
 													}}
@@ -276,6 +292,9 @@
 											triggerToast("Task Archived", [
 												task.id,
 											]);
+											tasksList = tasksList.filter(
+												(t) => t.id !== task.id,
+											);
 										}}
 									>
 										<input
@@ -298,12 +317,11 @@
 								<form
 									action="?/deleteTasks"
 									method="POST"
-									onsubmit={(e) => {
-										if (!confirm("Delete this task?"))
-											e.preventDefault();
-									}}
 									use:enhance={() => {
 										triggerToast("Task Deleted", []);
+										tasksList = tasksList.filter(
+											(t) => t.id !== task.id,
+										);
 									}}
 								>
 									<input
@@ -352,7 +370,7 @@
 
 	{#if selectedIds.length > 0 && !isLocked}
 		<div
-			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-2xl flex items-center gap-6 z-50 shadow-2xl animate-in slide-in-from-bottom-4"
+			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-2xl flex items-center gap-6 z-50 shadow-2xl animate-in slide-in-from-bottom-4 transition-all"
 		>
 			<span
 				class="text-[10px] font-black uppercase tracking-widest border-r border-zinc-700 pr-6 text-zinc-400"
@@ -366,6 +384,9 @@
 						triggerToast(`${selectedIds.length} Tasks Archived`, [
 							...selectedIds,
 						]);
+						tasksList = tasksList.filter(
+							(t) => !selectedIds.includes(t.id),
+						);
 						selectedIds = [];
 					}}
 				>
@@ -385,6 +406,9 @@
 					method="POST"
 					use:enhance={() => {
 						triggerToast(`${selectedIds.length} Tasks Deleted`, []);
+						tasksList = tasksList.filter(
+							(t) => !selectedIds.includes(t.id),
+						);
 						selectedIds = [];
 					}}
 				>
@@ -402,7 +426,7 @@
 			</div>
 			<button
 				onclick={() => (selectedIds = [])}
-				class="ml-2 p-1 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white"
+				class="ml-2 p-1 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
 				><X size={14} /></button
 			>
 		</div>
