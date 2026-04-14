@@ -175,7 +175,6 @@
 														? null
 														: task.id;
 											}}
-											// class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-zinc-900 transition-all"
 											class="flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-full border border-zinc-100 text-[10px] font-bold uppercase text-zinc-500 hover:border-zinc-900 transition-all"
 										>
 											<Briefcase size={12} />
@@ -278,14 +277,12 @@
 													? null
 													: task.id;
 										}}
-										class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-xl border border-zinc-100 text-xs font-bold text-zinc-600 hover:bg-zinc-50 transition-all"
+										class="flex items-center gap-2 text-xs font-bold {details.color} hover:opacity-70 transition-all"
 									>
-										<span
-											class="size-1.5 rounded-full {details.color.replace(
-												'text',
-												'bg',
-											)}"
-										></span>
+										<details.icon
+											size={14}
+											strokeWidth={2.5}
+										/>
 										{task.status}
 										<ChevronDown
 											size={14}
