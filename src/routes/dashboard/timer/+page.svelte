@@ -17,6 +17,7 @@
 	} from "lucide-svelte";
 	import { enhance } from "$app/forms";
 	import { invalidateAll } from "$app/navigation";
+	import { date } from "drizzle-orm/mysql-core";
 
 	let { data } = $props();
 
@@ -49,6 +50,31 @@
 		const m = Math.floor((totalSeconds % 3600) / 60);
 		const s = totalSeconds % 60;
 		return `${h}h ${m}m ${s}s`;
+	};
+
+	const startEditing = (day: any) => {
+		editingDay = day.date;
+		editH = Math.floor(day.totalSeconds / 3600);
+		editM = Math.floor((day.totalSeconds % 3600) / 60);
+		editS = day.totalSeconds % 60;
+	};
+
+	async function saveManualTime(dayDate: string) {
+		if (isOverLimit) return;
+		await fetch("/api/timer", {
+			method: "POST",
+			body: JSON.stringify({
+				action: "manual_save",
+				date: dayDate,
+				totalSeconds: totalEditSeconds,
+			}),
+		});
+		editingDay = null;
+		await invalidateAll();
+	}
+
+	const isToday = (dateStr: string) => {
+		return dateStr === new Date().toLocaleDateString("en-CA");
 	};
 
 	const getStatusDetails = (status: string) => {
@@ -99,28 +125,40 @@
 
 	<div class="space-y-10">
 		{#each data.dailyLogs as day}
-			<div
-				class="bg-white border border-zinc-100 rounded-[40px] shadow-sm"
-			>
-				<div
-					class="px-8 py-6 bg-zinc-50/50 border-b border-zinc-100 flex justify-between items-end"
-				>
+			<div class="relative">
+				<div class="flex justify-between items-end">
 					<div>
-						<h2
-							class="text-2xl font-black text-zinc-900 tracking-tight"
-						>
-							{day.date === new Date().toLocaleDateString("en-CA")
-								? "Today"
-								: day.date}
+						<h2 class="text-xl font-black text-zinc-900">
+							{#if day.date === new Date().toLocaleDateString("en-CA")}
+								<span class="day-label">Today, </span>
+								<span
+									class="date-label text-sm font-medium text-zinc-400"
+								>
+									{new Date(day.date).toLocaleDateString(
+										"en-ID",
+										{
+											day: "2-digit",
+											month: "long",
+											year: "numeric",
+										},
+									)}
+								</span>
+							{:else}
+								<span class="date-label">
+									{new Date(day.date).toLocaleDateString(
+										"en-ID",
+										{
+											day: "2-digit",
+											month: "short",
+											year: "numeric",
+										},
+									)}
+								</span>
+							{/if}
 						</h2>
-						<p
-							class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mt-1"
-						>
-							{day.dayTasks?.length || 0} Task Worked
-						</p>
 					</div>
-					<div class="flex items-center gap-4 text-right">
-						<div>
+					<div class="flex items-center gap-4">
+						<!-- <div>
 							<p
 								class="text-[10px] font-black {isOverLimit
 									? 'text-red-500'
@@ -137,28 +175,104 @@
 							</p>
 						</div>
 						<button
-							class="p-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-400 hover:text-zinc-900 shadow-sm transition-all"
-							><Pencil size={18} strokeWidth={2.5} /></button
-						>
+							class="p-1.5 rounded-md border border-zinc-200 bg-white text-zinc-400 hover:text-zinc-900 shadow-sm transition-all"
+							><Pencil size={14} strokeWidth={2.5} /></button
+						> -->
+						<div class="text-right">
+							<p
+								class="text-[10px] font-black {isOverLimit
+									? 'text-red-500'
+									: 'text-zinc-400'} uppercase tracking-widest mb-1"
+							>
+								{isOverLimit
+									? "Limit: 24h Max"
+									: "Total Logged"}
+							</p>
+							{#if editingDay === day.date}
+								<div
+									class="flex items-center gap-1 font-mono font-black text-2xl"
+								>
+									<input
+										type="number"
+										bind:value={editH}
+										class="w-12 bg-white border {isOverLimit
+											? 'border-red-500'
+											: 'border-zinc-200'} rounded-lg text-center outline-none"
+									/>
+									<span class="text-xs">h</span>
+									<input
+										type="number"
+										bind:value={editM}
+										class="w-12 bg-white border {isOverLimit
+											? 'border-red-500'
+											: 'border-zinc-200'} rounded-lg text-center outline-none"
+									/>
+									<span class="text-xs">m</span>
+									<input
+										type="number"
+										bind:value={editS}
+										class="w-12 bg-white border {isOverLimit
+											? 'border-red-500'
+											: 'border-zinc-200'} rounded-lg text-center outline-none"
+									/>
+									<span class="text-xs">s</span>
+								</div>
+							{:else}
+								<p
+									class="text-2xl font-mono font-black text-zinc-900"
+								>
+									{formatHMS(day.totalSeconds)}
+								</p>
+							{/if}
+						</div>
+						<div class="flex gap-2">
+							{#if editingDay === day.date}
+								<button
+									onclick={() => (editingDay = null)}
+									class="p-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-400 hover:text-red-500 transition-all shadow-sm"
+								>
+									<X size={18} strokeWidth={2.5} />
+								</button>
+							{/if}
+
+							{#if timer.status === "idle"}
+								<button
+									onclick={() =>
+										editingDay === day.date
+											? saveManualTime(day.date)
+											: startEditing(day)}
+									disabled={isOverLimit &&
+										editingDay === day.date}
+									class="p-2.5 rounded-xl border border-zinc-200 bg-white {isOverLimit &&
+									editingDay === day.date
+										? 'opacity-20'
+										: 'text-zinc-400 hover:text-zinc-900 hover:border-zinc-900'} transition-all shadow-sm"
+								>
+									{#if editingDay === day.date}
+										<Check
+											size={18}
+											strokeWidth={3}
+											class="text-emerald-500"
+										/>
+									{:else}
+										<Pencil size={18} strokeWidth={2.5} />
+									{/if}
+								</button>
+							{/if}
+						</div>
 					</div>
 				</div>
 
-				<div class="p-4 space-y-3">
+				<div class="py-4 space-y-3">
 					{#each day.dayTasks as task (task.id)}
 						{@const details = getStatusDetails(task.status)}
 						<div
-							class="flex items-center justify-between p-5 bg-white border border-zinc-100 rounded-3xl hover:border-zinc-300 transition-all group/task"
+							class="flex items-center justify-between p-5 bg-white border border-zinc-100 rounded-2xl hover:border-zinc-300 transition-all group/task"
 						>
 							<div class="flex items-center gap-5">
-								<div
-									class="size-12 rounded-2xl {details.bg} flex items-center justify-center {details.color} shrink-0"
-								>
-									<details.icon size={24} strokeWidth={2.5} />
-								</div>
-
 								<div class="overflow-visible">
 									<h4
-										class="font-bold text-zinc-900 text-lg leading-tight truncate"
+										class="font-bold text-zinc-900 leading-tight truncate"
 									>
 										{task.name}
 									</h4>

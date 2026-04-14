@@ -1,6 +1,6 @@
 import { db } from '$lib/db';
 import { timeLogs, dailySummaries, tasks, projects } from '$lib/db/schema';
-import { desc, eq, and, asc } from 'drizzle-orm';
+import { desc, eq, and, sql, asc } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 export const load = async ({ cookies }) => {
