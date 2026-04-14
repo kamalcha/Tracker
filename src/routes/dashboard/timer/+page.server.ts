@@ -1,36 +1,45 @@
 import { db } from '$lib/db';
 import { timeLogs, dailySummaries, tasks, projects } from '$lib/db/schema';
-import { desc, eq, and, sql } from 'drizzle-orm';
+import { desc, eq, and, asc } from 'drizzle-orm';
+import { fail } from '@sveltejs/kit';
 
 export const load = async ({ cookies }) => {
     const userId = Number(cookies.get('user_id'));
 
-    // 1. Fetch raw time sessions
+    // Fetch raw time sessions
     const logs = await db.select()
         .from(timeLogs)
         .where(eq(timeLogs.userId, userId))
         .orderBy(desc(timeLogs.startTime));
 
-    // 2. Fetch all manual overrides
+    // Fetch all manual overrides
     const summaries = await db.select()
         .from(dailySummaries)
         .where(eq(dailySummaries.userId, userId));
 
     const summaryMap = new Map(summaries.map(s => [s.date, s.manualTotalSeconds]));
 
-    // 3. Fetch all tasks joined with projects
+    // Fetch all projects for the dropdown
+    const userProjects = await db.select()
+        .from(projects)
+        .where(eq(projects.userId, userId))
+        .orderBy(asc(projects.name));
+
+    // Fetch tasks joined with projects
     const allTasks = await db.select({
         id: tasks.id,
         name: tasks.name,
         status: tasks.status,
         createdAt: tasks.createdAt,
+        projectId: tasks.projectId,
         projectName: projects.name
     })
         .from(tasks)
         .leftJoin(projects, eq(tasks.projectId, projects.id))
-        .where(eq(tasks.userId, userId));
+        .where(eq(tasks.userId, userId))
+        .orderBy(asc(tasks.id));
 
-    // 4. Group by Date
+    // Group logs by date
     const groupedData = logs.reduce((acc, log) => {
         if (!acc[log.date]) {
             const manualTotal = summaryMap.get(log.date);
@@ -40,7 +49,7 @@ export const load = async ({ cookies }) => {
                 isManual: manualTotal !== undefined,
                 calculatedSum: 0,
                 entries: [],
-                dayTasks: [] // Placeholder for tasks
+                dayTasks: []
             };
         }
         acc[log.date].entries.push(log);
@@ -52,11 +61,10 @@ export const load = async ({ cookies }) => {
         return acc;
     }, {} as Record<string, any>);
 
-    // 5. Tie Tasks to Dates (based on createdAt)
+    // Tie Tasks to Dates based on createdAt
     allTasks.forEach(task => {
         const taskDate = task.createdAt ? new Date(task.createdAt).toISOString().split('T')[0] : '';
         if (taskDate) {
-            // If the date card doesn't exist yet (e.g. task created but no time logged), create it
             if (!groupedData[taskDate]) {
                 groupedData[taskDate] = {
                     date: taskDate,
@@ -72,6 +80,32 @@ export const load = async ({ cookies }) => {
     });
 
     return {
-        dailyLogs: Object.values(groupedData).sort((a, b) => b.date.localeCompare(a.date))
+        dailyLogs: Object.values(groupedData).sort((a, b) => b.date.localeCompare(a.date)),
+        projects: userProjects
     };
+};
+
+export const actions = {
+    updateTask: async ({ request }) => {
+        const data = await request.formData();
+        const id = Number(data.get('id'));
+        const updateFields: any = {};
+
+        if (data.has('status')) {
+            const status = data.get('status')?.toString();
+            updateFields.status = status;
+            updateFields.completed = status === 'Done';
+        }
+
+        if (data.has('projectId')) {
+            const val = data.get('projectId');
+            updateFields.projectId = (val === "" || val === null) ? null : Number(val);
+        }
+
+        if (Object.keys(updateFields).length > 0) {
+            await db.update(tasks).set(updateFields).where(eq(tasks.id, id));
+        }
+
+        return { success: true };
+    }
 };
