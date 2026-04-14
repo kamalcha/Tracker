@@ -36,6 +36,8 @@ export const timeLogs = pgTable('time_logs', {
     userId: integer('user_id')
         .notNull()
         .references(() => users.id),
+    taskId: integer('task_id') // Add this column
+        .references(() => tasks.id),
     date: text('date').notNull(),
     startTime: timestamp('start_time', { withTimezone: true }).notNull(),
     endTime: timestamp('end_time', { withTimezone: true }),

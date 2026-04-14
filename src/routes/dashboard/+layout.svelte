@@ -33,7 +33,7 @@
 				</div>
 				<span
 					class="text-xl font-black tracking-tighter text-black uppercase"
-					>Pillarr Tasks</span
+					>Pilarr Tasks</span
 				>
 			</div>
 

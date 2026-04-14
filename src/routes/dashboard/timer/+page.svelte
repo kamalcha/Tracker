@@ -15,41 +15,10 @@
 		X,
 	} from "lucide-svelte";
 	import { invalidateAll } from "$app/navigation";
+	import { projects } from "$lib/db/schema";
 
 	// 1. Data from Server (Database Logs)
 	let { data } = $props();
-
-	// 2. Your Specific Dummy Task Data
-	let dummyTasks = $state([
-		{
-			id: 1,
-			name: "Task 1",
-			project: "None",
-			status: "Todo",
-			completed: false,
-		},
-		{
-			id: 2,
-			name: "Task 2",
-			project: "Redesign",
-			status: "In Progress",
-			completed: false,
-		},
-		{
-			id: 3,
-			name: "Task 3",
-			project: "Development",
-			status: "Blocked",
-			completed: false,
-		},
-		{
-			id: 4,
-			name: "Task 4",
-			project: "None",
-			status: "Done",
-			completed: true,
-		},
-	]);
 
 	// 3. UI State
 	let newTaskName = $state("");
@@ -126,7 +95,7 @@
 	};
 </script>
 
-<div class="max-w-4xl mx-auto p-8 space-y-12">
+<div class="mx-auto p-8 space-y-12">
 	<header class="space-y-4">
 		<h1
 			class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] ml-1"
@@ -160,7 +129,7 @@
 		{:else}
 			{#each data.dailyLogs as day}
 				<div
-					class="bg-white border border-zinc-100 rounded-[40px] shadow-sm overflow-hidden"
+					class="bg-white border border-zinc-100 rounded-[40px] shadow-sm"
 				>
 					<div
 						class="px-8 py-6 bg-zinc-50/50 border-b border-zinc-100 flex justify-between items-end"
@@ -177,7 +146,7 @@
 							<p
 								class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mt-1"
 							>
-								{day.entries?.length || 0} Sessions Recorded
+								{day.entries?.length || 0} Task Worked
 							</p>
 						</div>
 
@@ -273,7 +242,7 @@
 					</div>
 
 					<div class="p-4 space-y-3">
-						{#each dummyTasks as task}
+						{#each day.dayTasks as task}
 							{@const details = getStatusDetails(task.status)}
 							<div
 								class="flex items-center justify-between p-5 bg-white border border-zinc-100 rounded-3xl hover:border-zinc-300 transition-all group/task"
@@ -302,7 +271,7 @@
 											/>
 											<span
 												class="text-xs font-bold text-zinc-400 uppercase tracking-tighter"
-												>{task.project}</span
+												>{task.projectName}</span
 											>
 										</div>
 									</div>
