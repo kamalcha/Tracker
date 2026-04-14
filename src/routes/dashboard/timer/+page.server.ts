@@ -1,31 +1,31 @@
 import { db } from '$lib/db';
 import { timeLogs, dailySummaries, tasks, projects } from '$lib/db/schema';
-import { desc, eq, and, sql, asc } from 'drizzle-orm';
+import { desc, eq, and, sql, asc, inArray } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 export const load = async ({ cookies }) => {
     const userId = Number(cookies.get('user_id'));
 
-    // Fetch raw time sessions
+    // 1. Fetch raw time sessions
     const logs = await db.select()
         .from(timeLogs)
         .where(eq(timeLogs.userId, userId))
         .orderBy(desc(timeLogs.startTime));
 
-    // Fetch all manual overrides
+    // 2. Fetch all manual overrides
     const summaries = await db.select()
         .from(dailySummaries)
         .where(eq(dailySummaries.userId, userId));
 
     const summaryMap = new Map(summaries.map(s => [s.date, s.manualTotalSeconds]));
 
-    // Fetch all projects for the dropdown
+    // 3. Fetch all projects for the dropdown
     const userProjects = await db.select()
         .from(projects)
-        .where(eq(projects.userId, userId))
+        .where(and(eq(projects.userId, userId), eq(projects.isArchived, false)))
         .orderBy(asc(projects.name));
 
-    // Fetch tasks joined with projects
+    // 4. Fetch non-archived tasks with non-archived projects
     const allTasks = await db.select({
         id: tasks.id,
         name: tasks.name,
@@ -36,10 +36,15 @@ export const load = async ({ cookies }) => {
     })
         .from(tasks)
         .leftJoin(projects, eq(tasks.projectId, projects.id))
-        .where(eq(tasks.userId, userId))
+        .where(and(
+            eq(tasks.userId, userId),
+            eq(tasks.isArchived, false),
+            // Ensure we don't show tasks from archived projects
+            sql`(${tasks.projectId} IS NULL OR ${projects.isArchived} = false)`
+        ))
         .orderBy(asc(tasks.id));
 
-    // Group logs by date
+    // 5. Group logs and tie tasks by date
     const groupedData = logs.reduce((acc, log) => {
         if (!acc[log.date]) {
             const manualTotal = summaryMap.get(log.date);
@@ -107,5 +112,37 @@ export const actions = {
         }
 
         return { success: true };
-    }
+    },
+
+    // Permanent delete action for one or multiple tasks
+    deleteTasks: async ({ request }) => {
+        const data = await request.formData();
+        const ids = data.get('ids')?.toString().split(',').map(Number);
+
+        if (ids && ids.length > 0) {
+            await db.delete(tasks).where(inArray(tasks.id, ids));
+        }
+        return { success: true };
+    },
+
+    // BULK DELETE & WIPE DAY PROTOCOL [cite: 19, 20]
+    deleteBulk: async ({ request, cookies }) => {
+        const userId = Number(cookies.get('user_id'));
+        const data = await request.formData();
+        const taskIds = data.get('taskIds')?.toString().split(',').filter(Boolean).map(Number) || [];
+        const wipeDates = data.get('wipeDates')?.toString().split(',').filter(Boolean) || [];
+
+        // 1. Delete selected Tasks 
+        if (taskIds.length > 0) {
+            await db.delete(tasks).where(inArray(tasks.id, taskIds));
+        }
+
+        // 2. Wipe Day (Logs and Summaries) if Date Checkbox was used 
+        if (wipeDates.length > 0) {
+            await db.delete(timeLogs).where(and(eq(timeLogs.userId, userId), inArray(timeLogs.date, wipeDates)));
+            await db.delete(dailySummaries).where(and(eq(dailySummaries.userId, userId), inArray(dailySummaries.date, wipeDates)));
+        }
+
+        return { success: true };
+    },
 };

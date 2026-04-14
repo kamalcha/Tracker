@@ -21,6 +21,11 @@
 
 	let { data } = $props();
 
+	// Selection State
+	let selectedIds = $state<number[]>([]);
+	let selectedDates = $state<string[]>([]);
+	let selectedTaskIds = $state<number[]>([]);
+
 	// UI State
 	let newTaskName = $state("");
 	let editingDay = $state<string | null>(null);
@@ -105,9 +110,83 @@
 				};
 		}
 	};
+
+	// Helper for date-level selection
+	function toggleDay(date: string, tasks: any[]) {
+		const taskIds = tasks.map((t) => t.id);
+		const isDateSelected = selectedDates.includes(date);
+		const allSelected = taskIds.every((id) => selectedIds.includes(id));
+		if (isDateSelected) {
+			selectedDates = selectedDates.filter((d) => d !== date);
+			selectedTaskIds = selectedTaskIds.filter(
+				(id) => !taskIds.includes(id),
+			);
+		} else {
+			selectedDates = [...selectedDates, date];
+			selectedTaskIds = [...new Set([...selectedTaskIds, ...taskIds])];
+		}
+	}
+
+	function toggleTask(id: number) {
+		selectedTaskIds = selectedTaskIds.includes(id)
+			? selectedTaskIds.filter((i) => i !== id)
+			: [...selectedTaskIds, id];
+	}
 </script>
 
 <div class="mx-auto p-8 space-y-12">
+	{#if selectedTaskIds.length > 0 || selectedDates.length > 0}
+		<div
+			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-8 py-4 rounded-[32px] shadow-2xl z-[100] flex items-center gap-10 animate-in slide-in-from-bottom-8 duration-500"
+		>
+			<div class="flex flex-col">
+				<span
+					class="text-xs font-black uppercase tracking-widest text-zinc-400"
+					>Action Required</span
+				>
+				<span class="text-sm font-bold">
+					{selectedTaskIds.length} Tasks {selectedDates.length > 0
+						? `+ ${selectedDates.length} Full Days (Logs & Summaries)`
+						: ""}
+				</span>
+			</div>
+			<div class="flex items-center gap-3">
+				<form
+					action="?/deleteBulk"
+					method="POST"
+					use:enhance={() => {
+						selectedTaskIds = [];
+						selectedDates = [];
+					}}
+				>
+					<input
+						type="hidden"
+						name="taskIds"
+						value={selectedTaskIds.join(",")}
+					/>
+					<input
+						type="hidden"
+						name="wipeDates"
+						value={selectedDates.join(",")}
+					/>
+					<button
+						type="submit"
+						class="flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 rounded-2xl text-[10px] font-black uppercase transition-all"
+					>
+						<Trash2 size={14} /> Delete Selection
+					</button>
+				</form>
+				<button
+					onclick={() => {
+						selectedTaskIds = [];
+						selectedDates = [];
+					}}
+					class="p-2 hover:bg-zinc-800 rounded-xl transition-all"
+					><X size={20} /></button
+				>
+			</div>
+		</div>
+	{/if}
 	<header class="space-y-4">
 		<div class="relative group">
 			<input
@@ -127,7 +206,17 @@
 		{#each data.dailyLogs as day}
 			<div class="relative">
 				<div class="flex justify-between items-end">
-					<div>
+					<div class="flex items-center gap-4">
+						<button
+							onclick={() => toggleDay(day.date, day.dayTasks)}
+							class="size-6 rounded-lg border-2 flex items-center justify-center transition-all {selectedDates.includes(
+								day.date,
+							)
+								? 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-zinc-200'
+								: 'border-zinc-200 text-transparent hover:border-zinc-900'}"
+						>
+							<Check size={14} strokeWidth={4} />
+						</button>
 						<h2 class="text-xl font-black text-zinc-900">
 							{#if day.date === new Date().toLocaleDateString("en-CA")}
 								<span class="day-label">Today, </span>
@@ -158,26 +247,6 @@
 						</h2>
 					</div>
 					<div class="flex items-center gap-4">
-						<!-- <div>
-							<p
-								class="text-[10px] font-black {isOverLimit
-									? 'text-red-500'
-									: 'text-zinc-400'} uppercase tracking-widest mb-1"
-							>
-								{isOverLimit
-									? "Limit: 24h Max"
-									: "Total Logged"}
-							</p>
-							<p
-								class="text-2xl font-mono font-black text-zinc-900"
-							>
-								{formatHMS(day.totalSeconds)}
-							</p>
-						</div>
-						<button
-							class="p-1.5 rounded-md border border-zinc-200 bg-white text-zinc-400 hover:text-zinc-900 shadow-sm transition-all"
-							><Pencil size={14} strokeWidth={2.5} /></button
-						> -->
 						<div class="text-right">
 							<p
 								class="text-[10px] font-black {isOverLimit
@@ -270,6 +339,16 @@
 							class="flex items-center justify-between p-5 bg-white border border-zinc-100 rounded-2xl hover:border-zinc-300 transition-all group/task"
 						>
 							<div class="flex items-center gap-5">
+								<button
+									onclick={() => toggleTask(task.id)}
+									class="size-6 rounded-lg border-2 flex items-center justify-center transition-all {selectedTaskIds.includes(
+										task.id,
+									)
+										? 'bg-zinc-900 border-zinc-900 text-white'
+										: 'border-zinc-100 text-transparent group-hover/task:border-zinc-400'}"
+								>
+									<Check size={14} strokeWidth={4} />
+								</button>
 								<div class="overflow-visible">
 									<h4
 										class="font-bold text-zinc-900 leading-tight truncate"
@@ -437,11 +516,23 @@
 									{/if}
 								</div>
 
-								<button
-									class="p-2 text-zinc-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/task:opacity-100"
+								<form
+									action="?/deleteTasks"
+									method="POST"
+									use:enhance
 								>
-									<Trash2 size={20} strokeWidth={2.5} />
-								</button>
+									<input
+										type="hidden"
+										name="ids"
+										value={task.id}
+									/>
+									<button
+										type="submit"
+										class="p-2 text-zinc-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/task:opacity-100"
+									>
+										<Trash2 size={20} strokeWidth={2.5} />
+									</button>
+								</form>
 							</div>
 						</div>
 					{/each}
