@@ -125,7 +125,7 @@ export const actions = {
         return { success: true };
     },
 
-    // BULK DELETE & WIPE DAY PROTOCOL [cite: 19, 20]
+    // BULK DELETE & WIPE DAY PROTOCOL
     deleteBulk: async ({ request, cookies }) => {
         const userId = Number(cookies.get('user_id'));
         const data = await request.formData();
@@ -139,8 +139,20 @@ export const actions = {
 
         // 2. Wipe Day (Logs and Summaries) if Date Checkbox was used 
         if (wipeDates.length > 0) {
+            // Delete all time logs for these dates
             await db.delete(timeLogs).where(and(eq(timeLogs.userId, userId), inArray(timeLogs.date, wipeDates)));
+
+            // Delete all daily summaries for these dates
             await db.delete(dailySummaries).where(and(eq(dailySummaries.userId, userId), inArray(dailySummaries.date, wipeDates)));
+        }
+
+        // Delete ALL tasks for these dates (including archived) to prevent orphans
+        // This targets tasks by their creation date string
+        for (const date of wipeDates) {
+            await db.delete(tasks).where(and(
+                eq(tasks.userId, userId),
+                sql`DATE(${tasks.createdAt}) = ${date}`
+            ));
         }
 
         return { success: true };
