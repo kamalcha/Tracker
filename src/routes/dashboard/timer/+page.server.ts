@@ -91,6 +91,27 @@ export const load = async ({ cookies }) => {
 };
 
 export const actions = {
+    // Action to create a task from the header
+    createTask: async ({ request, cookies }) => {
+        const userId = Number(cookies.get('user_id'));
+        const data = await request.formData();
+        const name = data.get('name')?.toString();
+
+        if (!name || name.trim() === '') {
+            return fail(400, { message: 'Task name is required' });
+        }
+
+        await db.insert(tasks).values({
+            userId,
+            name: name.trim(),
+            status: 'Todo',
+            createdAt: new Date(),
+            isArchived: false
+        });
+
+        return { success: true };
+    },
+
     updateTask: async ({ request }) => {
         const data = await request.formData();
         const id = Number(data.get('id'));

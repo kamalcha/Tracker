@@ -64,6 +64,12 @@
 		editS = day.totalSeconds % 60;
 	};
 
+	// Helper to find today's specific log card
+	const getTodayLog = () => {
+		const todayStr = new Date().toLocaleDateString("en-CA");
+		return data.dailyLogs.find((day) => day.date === todayStr);
+	};
+
 	async function saveManualTime(dayDate: string) {
 		if (isOverLimit) return;
 		await fetch("/api/timer", {
@@ -189,16 +195,49 @@
 	{/if}
 	<header class="space-y-4">
 		<div class="relative group">
-			<input
-				type="text"
-				bind:value={newTaskName}
-				placeholder="What are you working on today?"
-				class="w-full h-20 bg-white border-2 border-zinc-100 rounded-[32px] pl-16 pr-6 text-2xl font-bold outline-none focus:border-zinc-900 focus:ring-8 focus:ring-zinc-50 transition-all placeholder:text-zinc-200"
-			/>
-			<Plus
-				class="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-300 group-focus-within:text-zinc-900"
-				size={28}
-			/>
+			<form
+				action="?/createTask"
+				method="POST"
+				use:enhance={({ formData, cancel }) => {
+					const name = formData.get("name")?.toString();
+
+					// 1. Prevent empty creation
+					if (!name || name.trim() === "") {
+						cancel();
+						return;
+					}
+
+					// 2. The "Morning Trigger" Check
+					const todayLog = getTodayLog();
+					const isFirstTask =
+						!todayLog || todayLog.dayTasks.length === 0;
+
+					// 3. Start Global Timer only if first task and idle
+					if (isFirstTask && timer.status === "idle") {
+						timer.start();
+					}
+
+					// Reset input after submission
+					return async ({ update }) => {
+						newTaskName = "";
+						await update();
+					};
+				}}
+				class="relative group"
+			>
+				<input
+					type="text"
+					name="name"
+					bind:value={newTaskName}
+					placeholder="What are you working on today?"
+					class="w-full h-20 bg-white border-2 border-zinc-100 rounded-[32px] pl-16 pr-6 text-2xl font-bold outline-none focus:border-zinc-900 focus:ring-8 focus:ring-zinc-50 transition-all placeholder:text-zinc-200"
+				/>
+				<Plus
+					class="absolute left-6 top-1/2 -translate-y-1/2 text-zinc-300 group-focus-within:text-zinc-900"
+					size={28}
+				/>
+				<button type="submit" class="hidden"></button>
+			</form>
 		</div>
 	</header>
 
