@@ -7,7 +7,7 @@ export async function POST({ request, cookies }) {
     const userId = Number(cookies.get('user_id'));
     if (!userId) return json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { action, date, totalSeconds } = await request.json();
+    const { action, date, totalSeconds, seconds, lastSeen } = await request.json();
 
     if (action === 'manual_save') {
         await db.insert(dailySummaries)
@@ -28,6 +28,20 @@ export async function POST({ request, cookies }) {
         return json({ success: true });
     }
 
+    if (action === 'sync') {
+        await db.update(timeLogs)
+            .set({
+                duration: seconds,
+                lastSeenAt: new Date(lastSeen)
+            })
+            .where(and(
+                eq(timeLogs.userId, userId),
+                eq(timeLogs.date, date),
+                isNull(timeLogs.endTime)
+            ));
+        return json({ success: true });
+    }
+
     if (action === 'stop') {
         const now = new Date();
         const [activeLog] = await db.select().from(timeLogs)
@@ -38,7 +52,11 @@ export async function POST({ request, cookies }) {
             const duration = Math.floor((now.getTime() - activeLog.startTime.getTime()) / 1000);
 
             // 1. Close the log
-            await db.update(timeLogs).set({ endTime: now, duration }).where(eq(timeLogs.id, activeLog.id));
+            await db.update(timeLogs).set({
+                endTime: now,
+                duration,
+                lastSeenAt: now
+            }).where(eq(timeLogs.id, activeLog.id));
 
             // 2. Option A: Add duration to summary (if it exists) or create it from the current day's sum
             const currentTotal = await db.select().from(dailySummaries)

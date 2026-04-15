@@ -12,6 +12,7 @@ class TimerState {
 
     private tickInterval: any = null;
     private heartbeatInterval: any = null;
+    private intentTimeout: any = null;
 
     constructor() {
         if (browser) this.init();
@@ -112,6 +113,7 @@ class TimerState {
         // if (this.interval) clearInterval(this.interval);
         if (this.tickInterval) clearInterval(this.tickInterval);
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        if (this.intentTimeout) clearTimeout(this.intentTimeout);
 
         // 1. The Ticker (UI update)
         this.tickInterval = setInterval(() => {
@@ -124,23 +126,46 @@ class TimerState {
             }
         }, 1000);
 
-        // 2. The Heartbeat (Silent DB Sync every 60s)
-        this.heartbeatInterval = setInterval(() => {
-            this.silentSync();
-        }, 60000);
+        // 2. The Heartbeat
+        // Stage 1: Wait 10 seconds to confirm user intent [cite: 26, 27]
+        this.intentTimeout = setTimeout(async () => {
+            await this.silentSync();
+
+            // Stage 2: Only start the 60s heartbeat after the first 10s pulse [cite: 26, 27]
+            this.heartbeatInterval = setInterval(() => {
+                this.silentSync();
+            }, 60000);
+        }, 10000);
+        // this.heartbeatInterval = setInterval(() => {
+        //     this.silentSync();
+        // }, 60000);
     }
 
     private async silentSync() {
+        try {
+            await fetch('/api/timer', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'sync',
+                    date: this.currentDate,
+                    seconds: this.seconds,
+                    lastSeen: new Date().toISOString()
+                })
+            });
+        } catch (e) {
+            // Silently fail to keep the console clean; local storage is the backup
+        }
+
         // Send a pulse without refreshing the UI (no invalidateAll)
-        await fetch('/api/timer', {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'sync',
-                date: this.currentDate,
-                seconds: this.seconds,
-                lastSeen: new Date().toISOString()
-            })
-        });
+        // await fetch('/api/timer', {
+        //     method: 'POST',
+        //     body: JSON.stringify({
+        //         action: 'sync',
+        //         date: this.currentDate,
+        //         seconds: this.seconds,
+        //         lastSeen: new Date().toISOString()
+        //     })
+        // });
     }
 
     async stop() {
@@ -155,6 +180,7 @@ class TimerState {
     reset() {
         if (this.tickInterval) clearInterval(this.tickInterval);
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        if (this.intentTimeout) clearTimeout(this.intentTimeout);
         this.status = 'idle';
         this.seconds = 0;
         localStorage.removeItem('punch_clock_start');

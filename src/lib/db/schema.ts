@@ -42,7 +42,7 @@ export const timeLogs = pgTable('time_logs', {
     startTime: timestamp('start_time', { withTimezone: true }).notNull(),
     endTime: timestamp('end_time', { withTimezone: true }),
     duration: integer('duration').default(0),
-    lastSeenAt: timestamp('last_seen_at').defaultNow(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow(),
 });
 
 export const dailySummaries = pgTable('daily_summaries', {

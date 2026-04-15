@@ -311,15 +311,6 @@
 					</div>
 					<div class="flex items-center gap-4">
 						<div class="text-right">
-							<!-- <p
-								class="text-[10px] font-black {isOverLimit
-									? 'text-red-500'
-									: 'text-zinc-400'} uppercase tracking-widest mb-1"
-							>
-								{isOverLimit
-									? "Limit: 24h Max"
-									: "Total Logged"}
-							</p> -->
 							{#if editingDay === day.date}
 								<div
 									class="flex items-center gap-1 font-mono font-black text-2xl"
