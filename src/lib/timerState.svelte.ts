@@ -22,6 +22,14 @@ class TimerState {
         }
     }
 
+    // Reset logic for "Hard Starts" and "Day Wipes"
+    reset() {
+        if (this.interval) clearInterval(this.interval);
+        this.status = 'idle';
+        this.seconds = 0;
+        localStorage.removeItem('punch_clock_start');
+    }
+
     get elapsed() {
         const h = Math.floor(this.seconds / 3600).toString().padStart(2, '0');
         const m = Math.floor((this.seconds % 3600) / 60).toString().padStart(2, '0');
@@ -30,6 +38,7 @@ class TimerState {
     }
 
     async start() {
+        this.reset();
         const now = new Date();
         this.status = 'working';
         this.seconds = 0;
@@ -83,10 +92,11 @@ class TimerState {
             body: JSON.stringify({ action: 'stop', date: this.currentDate })
         });
 
-        this.status = 'idle';
-        clearInterval(this.interval);
-        localStorage.removeItem('punch_clock_start');
-        this.seconds = 0;
+        this.reset(); // Use the shared reset logic here
+        // this.status = 'idle';
+        // clearInterval(this.interval);
+        // localStorage.removeItem('punch_clock_start');
+        // this.seconds = 0;
 
         if (browser) {
             await invalidateAll();

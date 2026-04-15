@@ -50,6 +50,9 @@
 		),
 	);
 
+	// Helper for Today's Date String
+	const todayStr = new Date().toLocaleDateString("en-CA");
+
 	const formatHMS = (totalSeconds: number) => {
 		const h = Math.floor(totalSeconds / 3600);
 		const m = Math.floor((totalSeconds % 3600) / 60);
@@ -68,6 +71,16 @@
 	const getTodayLog = () => {
 		const todayStr = new Date().toLocaleDateString("en-CA");
 		return data.dailyLogs.find((day) => day.date === todayStr);
+	};
+
+	// Live Total Helper: Combines DB time + current live session if Today
+	const getLiveTotal = (day: any) => {
+		let total = day.totalSeconds;
+		// If this is the "Today" card and the timer is running, add live seconds
+		if (day.date === todayStr && timer.status === "working") {
+			total += timer.seconds;
+		}
+		return total;
 	};
 
 	async function saveManualTime(dayDate: string) {
@@ -145,24 +158,35 @@
 		<div
 			class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-8 py-4 rounded-[32px] shadow-2xl z-[100] flex items-center gap-10 animate-in slide-in-from-bottom-8 duration-500"
 		>
-			<div class="flex flex-col">
-				<span
-					class="text-xs font-black uppercase tracking-widest text-zinc-400"
-					>Action Required</span
-				>
-				<span class="text-sm font-bold">
-					{selectedTaskIds.length} Tasks {selectedDates.length > 0
-						? `+ ${selectedDates.length} Full Days (Logs & Summaries)`
-						: ""}
+			<div class="flex-1 min-w-0 flex-col">
+				<span class="text-sm leading-snug">
+					{#if selectedDates.length === 1}
+						Are you sure you want to delete {selectedDates[0]} log? Deleting
+						this will also removes all tasks related to it. This cannot
+						be undone.
+					{:else if selectedDates.length > 1}
+						Are you sure you want to delete these logs? Deleting
+						them will also remove all tasks related to them. This
+						cannot be undone.
+					{:else}
+						Are you sure you want to delete {selectedTaskIds.length}
+						selected tasks?
+					{/if}
 				</span>
 			</div>
-			<div class="flex items-center gap-3">
+			<div class="shrink-0 flex items-center gap-3">
 				<form
 					action="?/deleteBulk"
 					method="POST"
 					use:enhance={() => {
-						selectedTaskIds = [];
-						selectedDates = [];
+						if (selectedDates.includes(todayStr)) {
+							timer.reset();
+						}
+						return async ({ update }) => {
+							selectedTaskIds = [];
+							selectedDates = [];
+							await update();
+						};
 					}}
 				>
 					<input
@@ -329,7 +353,8 @@
 								<p
 									class="text-2xl font-mono font-black text-zinc-900"
 								>
-									{formatHMS(day.totalSeconds)}
+									<!-- {formatHMS(day.totalSeconds)} -->
+									{formatHMS(getLiveTotal(day))}
 								</p>
 							{/if}
 						</div>
@@ -573,6 +598,21 @@
 									</button>
 								</form>
 							</div>
+						</div>
+					{:else}
+						<div
+							class="flex flex-col items-center justify-center p-12 border-2 border-dashed border-zinc-100 rounded-[32px] bg-zinc-50/30"
+						>
+							<div
+								class="size-12 rounded-2xl bg-white border border-zinc-100 flex items-center justify-center mb-3 text-zinc-200"
+							>
+								<Calendar size={24} />
+							</div>
+							<p
+								class="text-[10px] font-black text-zinc-400 uppercase tracking-widest"
+							>
+								No tasks created for this day
+							</p>
 						</div>
 					{/each}
 				</div>
