@@ -14,10 +14,14 @@
 		Check,
 		X,
 		Search,
+		ChevronLeft,
+		ChevronRight,
+		Calendar as CalendarIcon,
 	} from "lucide-svelte";
 	import { enhance } from "$app/forms";
 	import { invalidateAll } from "$app/navigation";
 	import { date } from "drizzle-orm/mysql-core";
+	import { clickOutside } from "$lib/actions/clickOutside";
 
 	let { data } = $props();
 
@@ -32,6 +36,13 @@
 	let editH = $state(0);
 	let editM = $state(0);
 	let editS = $state(0);
+	let viewDate = $state(new Date());
+	let isShaking = $state(false);
+	let rangeStart = $state<Date>(getStartOfWeek(new Date()));
+	let rangeEnd = $state<Date>(getEndOfWeek(new Date()));
+	let calendarMonth = $state(new Date()); // Controls the calendar UI month
+	let isCalendarOpen = $state(false);
+	let datePicker: HTMLInputElement;
 
 	// Interactive State
 	let activeStatusDropdown = $state<number | null>(null);
@@ -82,6 +93,165 @@
 		}
 		return total;
 	};
+
+	// --- DATE HELPERS ---
+	function getStartOfWeek(d: Date) {
+		const date = new Date(d);
+		const day = date.getDay(); // 0 is Sunday
+		const diff = date.getDate() - day;
+		return new Date(new Date(date.setDate(diff)).setHours(0, 0, 0, 0));
+	}
+
+	function getEndOfWeek(d: Date) {
+		const start = getStartOfWeek(d);
+		return new Date(
+			new Date(start.setDate(start.getDate() + 6)).setHours(
+				23,
+				59,
+				59,
+				999,
+			),
+		);
+	}
+
+	// Dynamic Header Text
+	let rangeLabel = $derived(() => {
+		const opt: Intl.DateTimeFormatOptions = {
+			day: "2-digit",
+			month: "short",
+			year: "numeric",
+		};
+		if (rangeStart.toDateString() === rangeEnd.toDateString()) {
+			return rangeStart.toLocaleDateString("en-ID", opt);
+		}
+		const startOpt: Intl.DateTimeFormatOptions = {
+			day: "2-digit",
+			month: "short",
+		};
+		return `${rangeStart.toLocaleDateString("en-ID", startOpt)} - ${rangeEnd.toLocaleDateString("en-ID", opt)}`;
+	});
+
+	// Range display: "13 Apr - 19 Apr 2026"
+	let weekRangeText = $derived(() => {
+		const start = getStartOfWeek(viewDate);
+		const end = getEndOfWeek(viewDate);
+		const opt: Intl.DateTimeFormatOptions = {
+			day: "2-digit",
+			month: "short",
+		};
+		return `${start.toLocaleDateString("en-ID", opt)} - ${end.toLocaleDateString("en-ID", opt)} ${end.getFullYear()}`;
+	});
+
+	let daysInMonth = $derived(() => {
+		const year = calendarMonth.getFullYear();
+		const month = calendarMonth.getMonth();
+		const firstDay = new Date(year, month, 1).getDay(); // Sunday = 0
+		const daysCount = new Date(year, month + 1, 0).getDate();
+
+		const days = [];
+		// Padding for previous month
+		for (let i = 0; i < firstDay; i++) days.push(null);
+		// Days of current month
+		for (let i = 1; i <= daysCount; i++)
+			days.push(new Date(year, month, i));
+		return days;
+	});
+
+	// Navigation functions
+	const goPrevWeek = () => {
+		rangeStart = new Date(rangeStart.setDate(rangeStart.getDate() - 7));
+		rangeEnd = new Date(rangeEnd.setDate(rangeEnd.getDate() - 7));
+	};
+
+	const goNextWeek = () => {
+		const nextS = new Date(
+			new Date(rangeStart).setDate(rangeStart.getDate() + 7),
+		);
+		const nextE = new Date(
+			new Date(rangeEnd).setDate(rangeEnd.getDate() + 7),
+		);
+		if (nextS > new Date()) return;
+		rangeStart = nextS;
+		rangeEnd = nextE;
+	};
+
+	const goToday = () => {
+		const today = new Date();
+		const tStart = getStartOfWeek(today);
+		const tEnd = getEndOfWeek(today);
+		if (
+			rangeStart.toDateString() === tStart.toDateString() &&
+			rangeEnd.toDateString() === tEnd.toDateString()
+		) {
+			triggerShake();
+			return;
+		}
+		rangeStart = tStart;
+		rangeEnd = tEnd;
+	};
+
+	const handleDateClick = (date: Date) => {
+		const clickedDate = new Date(date);
+		const startStr = rangeStart.toDateString();
+		const endStr = rangeEnd.toDateString();
+
+		// Scenario: A single day is currently selected
+		if (startStr === endStr) {
+			if (clickedDate.getTime() > rangeStart.getTime()) {
+				// Second click is in the future: complete the range
+				rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
+				isCalendarOpen = false; // Selection finished, close UI
+			} else {
+				// Second click is earlier or the same: treat as a new starting point
+				rangeStart = new Date(clickedDate.setHours(0, 0, 0, 0));
+				rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
+			}
+		} else {
+			// Scenario: A range was already active: reset to a single day
+			rangeStart = new Date(clickedDate.setHours(0, 0, 0, 0));
+			rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
+		}
+	};
+
+	let filteredLogs = $derived(() => {
+		return data.dailyLogs.filter((log) => {
+			const d = new Date(log.date);
+			return d >= rangeStart && d <= rangeEnd;
+		});
+	});
+
+	// Handle Calendar Selection
+	const handleDateSelect = (e: Event) => {
+		const target = e.target as HTMLInputElement;
+		if (target.value) {
+			viewDate = new Date(target.value);
+		}
+	};
+
+	const triggerShake = () => {
+		isShaking = false;
+		setTimeout(() => {
+			isShaking = true;
+			setTimeout(() => {
+				isShaking = false;
+			}, 300);
+		}, 10);
+	};
+
+	// Filter current logs to only show the selected week
+	let currentWeekLogs = $derived(() => {
+		const start = getStartOfWeek(viewDate);
+		const end = getEndOfWeek(viewDate);
+		return data.dailyLogs.filter((log) => {
+			const logDate = new Date(log.date);
+			return logDate >= start && logDate <= end;
+		});
+	});
+
+	const isFutureBlocked = $derived(
+		new Date(new Date(rangeStart).setDate(rangeStart.getDate() + 7)) >
+			new Date(),
+	);
 
 	async function saveManualTime(dayDate: string) {
 		if (isOverLimit) return;
@@ -217,7 +387,8 @@
 			</div>
 		</div>
 	{/if}
-	<header class="space-y-4">
+
+	<header class="sticky-header py-4 border-b border-zinc-50">
 		<div class="relative group">
 			<form
 				action="?/createTask"
@@ -265,8 +436,148 @@
 		</div>
 	</header>
 
+	<nav class="flex items-center gap-4 py-2">
+		<div class="flex items-center gap-2">
+			<button
+				onclick={goPrevWeek}
+				class="p-2 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-900"
+			>
+				<ChevronLeft size={20} />
+			</button>
+
+			<div class="relative">
+				<button
+					onclick={() => (isCalendarOpen = !isCalendarOpen)}
+					class="px-4 py-2 hover:bg-zinc-50 rounded-2xl transition-all flex items-center gap-2"
+				>
+					<span
+						class="text-sm font-black uppercase tracking-widest text-zinc-900"
+					>
+						{rangeLabel()}
+					</span>
+					<CalendarIcon size={14} class="text-zinc-400" />
+				</button>
+
+				{#if isCalendarOpen}
+					<div
+						use:clickOutside={() => (isCalendarOpen = false)}
+						class="absolute top-full left-0 mt-4 p-6 bg-white border border-zinc-100 shadow-2xl rounded-[32px] z-[100] w-80 animate-in fade-in zoom-in-95 duration-200"
+					>
+						<div
+							class="flex items-center justify-between mb-4 px-2"
+						>
+							<span
+								class="text-xs font-black uppercase tracking-widest"
+							>
+								{calendarMonth.toLocaleDateString("en-ID", {
+									month: "long",
+									year: "numeric",
+								})}
+							</span>
+							<div class="flex gap-1">
+								<button
+									onclick={() =>
+										(calendarMonth = new Date(
+											calendarMonth.setMonth(
+												calendarMonth.getMonth() - 1,
+											),
+										))}
+									class="p-1 hover:bg-zinc-100 rounded-lg"
+									><ChevronLeft size={14} /></button
+								>
+								<button
+									onclick={() =>
+										(calendarMonth = new Date(
+											calendarMonth.setMonth(
+												calendarMonth.getMonth() + 1,
+											),
+										))}
+									class="p-1 hover:bg-zinc-100 rounded-lg"
+									><ChevronRight size={14} /></button
+								>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-7 gap-1 text-center">
+							{#each ["S", "M", "T", "W", "T", "F", "S"] as d}
+								<span
+									class="text-[10px] font-black text-zinc-300 py-2"
+									>{d}</span
+								>
+							{/each}
+
+							{#each daysInMonth() as date}
+								{#if date}
+									{@const dateMs = date.setHours(0, 0, 0, 0)}
+									{@const startMs = new Date(
+										rangeStart,
+									).setHours(0, 0, 0, 0)}
+									{@const endMs = new Date(rangeEnd).setHours(
+										0,
+										0,
+										0,
+										0,
+									)}
+
+									{@const isStart = dateMs === startMs}
+									{@const isEnd = dateMs === endMs}
+									{@const isBetween =
+										dateMs > startMs && dateMs < endMs}
+									{@const isSingle = isStart && isEnd}
+
+									<div class="relative py-0.5">
+										{#if isStart || isEnd || isBetween}
+											<div
+												class="absolute inset-y-0.5 left-0 right-0 bg-zinc-100
+					{isStart && !isSingle ? 'rounded-l-full ml-1' : ''}
+					{isEnd && !isSingle ? 'rounded-r-full mr-1' : ''}
+					{isSingle ? 'rounded-full mx-1' : ''}"
+											></div>
+										{/if}
+
+										<button
+											onclick={() =>
+												handleDateClick(date)}
+											class="relative z-10 aspect-square w-full flex items-center justify-center text-[11px] font-bold rounded-full transition-all
+				{isStart || isEnd
+												? 'bg-zinc-900 text-white shadow-lg'
+												: 'text-zinc-600 hover:bg-zinc-200/50'}"
+										>
+											{date.getDate()}
+										</button>
+									</div>
+								{:else}
+									<div class="aspect-square"></div>
+								{/if}
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<button
+				onclick={goNextWeek}
+				disabled={isFutureBlocked}
+				class="p-2 hover:bg-zinc-100 rounded-xl transition-all text-zinc-400 hover:text-zinc-900 disabled:opacity-20"
+			>
+				<ChevronRight size={20} />
+			</button>
+		</div>
+
+		<button
+			onclick={goToday}
+			class="px-5 py-2.5 bg-zinc-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-zinc-800 {isShaking
+				? 'shake-anim'
+				: ''}"
+		>
+			Today
+		</button>
+	</nav>
+
 	<div class="space-y-10">
-		{#each data.dailyLogs as day}
+		<!-- {#each data.dailyLogs as day} -->
+		<!-- {#each currentWeekLogs() as day} -->
+		{#each filteredLogs() as day}
 			<div class="relative">
 				<div class="flex justify-between items-end">
 					<div class="flex items-center gap-4">
@@ -621,6 +932,17 @@
 				</div>
 			</div>
 		{/each}
+		{#if filteredLogs().length === 0}
+			<div
+				class="py-20 text-center border-2 border-dashed border-zinc-100 rounded-[40px]"
+			>
+				<p
+					class="text-xs font-black uppercase tracking-widest text-zinc-300"
+				>
+					No activity found for this week
+				</p>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -631,5 +953,31 @@
 	:global(.scrollbar-thin::-webkit-scrollbar-thumb) {
 		background: #f4f4f5;
 		border-radius: 10px;
+	}
+
+	/* Soft Shake Animation */
+	@keyframes shake {
+		0%,
+		100% {
+			transform: translateX(0);
+		}
+		20%,
+		60% {
+			transform: translateX(-2px);
+		}
+		40%,
+		80% {
+			transform: translateX(2px);
+		}
+	}
+	.shake-anim {
+		animation: shake 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+	}
+
+	.sticky-header {
+		position: sticky;
+		top: 0;
+		z-index: 50;
+		background: white;
 	}
 </style>
