@@ -311,7 +311,7 @@
 					</div>
 					<div class="flex items-center gap-4">
 						<div class="text-right">
-							<p
+							<!-- <p
 								class="text-[10px] font-black {isOverLimit
 									? 'text-red-500'
 									: 'text-zinc-400'} uppercase tracking-widest mb-1"
@@ -319,7 +319,7 @@
 								{isOverLimit
 									? "Limit: 24h Max"
 									: "Total Logged"}
-							</p>
+							</p> -->
 							{#if editingDay === day.date}
 								<div
 									class="flex items-center gap-1 font-mono font-black text-2xl"
@@ -351,9 +351,21 @@
 								</div>
 							{:else}
 								<p
-									class="text-2xl font-mono font-black text-zinc-900"
+									class="text-[10px] font-black uppercase tracking-widest mb-1
+            {timer.isOverTime && isToday(day.date)
+										? 'text-amber-500'
+										: 'text-zinc-400'}"
 								>
-									<!-- {formatHMS(day.totalSeconds)} -->
+									{timer.isOverTime && isToday(day.date)
+										? "Session Over 12h"
+										: "Total Logged"}
+								</p>
+								<p
+									class="text-2xl font-mono font-black transition-colors duration-500
+        {timer.isOverTime && isToday(day.date)
+										? 'text-amber-600'
+										: 'text-zinc-900'}"
+								>
 									{formatHMS(getLiveTotal(day))}
 								</p>
 							{/if}

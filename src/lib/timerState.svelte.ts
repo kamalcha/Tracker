@@ -7,28 +7,81 @@ class TimerState {
     currentDate = $state<string>('');
     private interval: any = null;
 
+    // Derived state for the Visual Nudge
+    isOverTime = $derived(this.seconds > 12 * 3600);
+
+    private tickInterval: any = null;
+    private heartbeatInterval: any = null;
+
     constructor() {
         if (browser) this.init();
     }
 
-    private init() {
+    private async init() {
         const savedStart = localStorage.getItem('punch_clock_start');
-        if (savedStart) {
-            const start = new Date(savedStart);
-            const now = new Date();
-            this.currentDate = start.toLocaleDateString('en-CA');
+        if (!savedStart) return;
+
+        const start = new Date(savedStart);
+        const now = new Date();
+        const startDay = start.toLocaleDateString('en-CA');
+        const today = now.toLocaleDateString('en-CA');
+
+        // --- THE MIDNIGHT CATCH-UP ---
+        // If the browser was closed over one or more midnights
+        if (startDay !== today) {
+            await this.catchUpMissingDays(start, now);
+        } else {
+            this.currentDate = startDay;
             this.seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
             this.resume();
         }
+
+        // if (savedStart) {
+        //     const start = new Date(savedStart);
+        //     const now = new Date();
+        //     this.currentDate = start.toLocaleDateString('en-CA');
+        //     this.seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
+        //     this.resume();
+        // }
+    }
+
+    private async catchUpMissingDays(startDate: Date, endDate: Date) {
+        let current = new Date(startDate);
+
+        while (current.toLocaleDateString('en-CA') !== endDate.toLocaleDateString('en-CA')) {
+            const dateStr = current.toLocaleDateString('en-CA');
+
+            // Sync this full or partial day to the DB
+            await fetch('/api/timer', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'stop', date: dateStr })
+            });
+
+            // Move to the next day at 00:00:00
+            current.setDate(current.getDate() + 1);
+            current.setHours(0, 0, 0, 0);
+
+            // Start the next day in the DB
+            await fetch('/api/timer', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'start', date: current.toLocaleDateString('en-CA') })
+            });
+        }
+
+        // Finalize state for the current day
+        this.currentDate = endDate.toLocaleDateString('en-CA');
+        this.seconds = Math.floor((endDate.getTime() - current.getTime()) / 1000);
+        localStorage.setItem('punch_clock_start', current.toISOString());
+        this.resume();
     }
 
     // Reset logic for "Hard Starts" and "Day Wipes"
-    reset() {
-        if (this.interval) clearInterval(this.interval);
-        this.status = 'idle';
-        this.seconds = 0;
-        localStorage.removeItem('punch_clock_start');
-    }
+    // reset() {
+    //     if (this.interval) clearInterval(this.interval);
+    //     this.status = 'idle';
+    //     this.seconds = 0;
+    //     localStorage.removeItem('punch_clock_start');
+    // }
 
     get elapsed() {
         const h = Math.floor(this.seconds / 3600).toString().padStart(2, '0');
@@ -56,8 +109,12 @@ class TimerState {
 
     private resume() {
         this.status = 'working';
-        if (this.interval) clearInterval(this.interval);
-        this.interval = setInterval(() => {
+        // if (this.interval) clearInterval(this.interval);
+        if (this.tickInterval) clearInterval(this.tickInterval);
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+
+        // 1. The Ticker (UI update)
+        this.tickInterval = setInterval(() => {
             this.seconds++;
 
             // --- MIDNIGHT ROLLOVER ---
@@ -66,6 +123,41 @@ class TimerState {
                 this.handleMidnight(today);
             }
         }, 1000);
+
+        // 2. The Heartbeat (Silent DB Sync every 60s)
+        this.heartbeatInterval = setInterval(() => {
+            this.silentSync();
+        }, 60000);
+    }
+
+    private async silentSync() {
+        // Send a pulse without refreshing the UI (no invalidateAll)
+        await fetch('/api/timer', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'sync',
+                date: this.currentDate,
+                seconds: this.seconds,
+                lastSeen: new Date().toISOString()
+            })
+        });
+    }
+
+    async stop() {
+        await fetch('/api/timer', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'stop', date: this.currentDate })
+        });
+        this.reset();
+        if (browser) await invalidateAll();
+    }
+
+    reset() {
+        if (this.tickInterval) clearInterval(this.tickInterval);
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        this.status = 'idle';
+        this.seconds = 0;
+        localStorage.removeItem('punch_clock_start');
     }
 
     private async handleMidnight(newDate: string) {
@@ -86,22 +178,22 @@ class TimerState {
         });
     }
 
-    async stop() {
-        await fetch('/api/timer', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'stop', date: this.currentDate })
-        });
+    // async stop() {
+    //     await fetch('/api/timer', {
+    //         method: 'POST',
+    //         body: JSON.stringify({ action: 'stop', date: this.currentDate })
+    //     });
 
-        this.reset(); // Use the shared reset logic here
-        // this.status = 'idle';
-        // clearInterval(this.interval);
-        // localStorage.removeItem('punch_clock_start');
-        // this.seconds = 0;
+    //     this.reset(); // Use the shared reset logic here
+    //     // this.status = 'idle';
+    //     // clearInterval(this.interval);
+    //     // localStorage.removeItem('punch_clock_start');
+    //     // this.seconds = 0;
 
-        if (browser) {
-            await invalidateAll();
-        }
-    }
+    //     if (browser) {
+    //         await invalidateAll();
+    //     }
+    // }
 }
 
 export const timer = new TimerState();
