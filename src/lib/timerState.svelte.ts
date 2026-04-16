@@ -34,7 +34,7 @@ class TimerState {
         } else {
             this.currentDate = startDay;
             this.seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
-            this.resume();
+            this.resume(this.seconds, startDay);
         }
 
         // if (savedStart) {
@@ -73,7 +73,7 @@ class TimerState {
         this.currentDate = endDate.toLocaleDateString('en-CA');
         this.seconds = Math.floor((endDate.getTime() - current.getTime()) / 1000);
         localStorage.setItem('punch_clock_start', current.toISOString());
-        this.resume();
+        this.resume(this.seconds, this.currentDate);
     }
 
     // Reset logic for "Hard Starts" and "Day Wipes"
@@ -92,10 +92,10 @@ class TimerState {
     }
 
     async start() {
-        this.reset();
+        // this.reset();
         const now = new Date();
-        this.status = 'working';
-        this.seconds = 0;
+        // this.status = 'working';
+        // this.seconds = 0;
         this.currentDate = now.toLocaleDateString('en-CA');
 
         localStorage.setItem('punch_clock_start', now.toISOString());
@@ -105,25 +105,40 @@ class TimerState {
             body: JSON.stringify({ action: 'start', date: this.currentDate })
         });
 
-        this.resume();
+        this.resume(0, this.currentDate);
     }
 
-    private resume() {
+    // private resume() {
+    //     this.status = 'working';
+    //     // if (this.interval) clearInterval(this.interval);
+    //     if (this.tickInterval) clearInterval(this.tickInterval);
+    //     if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    //     if (this.intentTimeout) clearTimeout(this.intentTimeout);
+
+    //     // 1. The Ticker (UI update)
+    //     this.tickInterval = setInterval(() => {
+    //         this.seconds++;
+
+    //         // --- MIDNIGHT ROLLOVER ---
+    //         const today = new Date().toLocaleDateString('en-CA');
+    //         if (today !== this.currentDate) {
+    //             this.handleMidnight(today);
+    //         }
+    //     }, 1000);
+    resume(initialSeconds: number, date: string) {
+        this.seconds = initialSeconds;
+        this.currentDate = date;
         this.status = 'working';
-        // if (this.interval) clearInterval(this.interval);
+
         if (this.tickInterval) clearInterval(this.tickInterval);
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         if (this.intentTimeout) clearTimeout(this.intentTimeout);
 
-        // 1. The Ticker (UI update)
+        // 1. THE TICKER: Updates the UI every second
         this.tickInterval = setInterval(() => {
             this.seconds++;
-
-            // --- MIDNIGHT ROLLOVER ---
             const today = new Date().toLocaleDateString('en-CA');
-            if (today !== this.currentDate) {
-                this.handleMidnight(today);
-            }
+            if (today !== this.currentDate) this.handleMidnight(today);
         }, 1000);
 
         // 2. The Heartbeat
@@ -135,16 +150,18 @@ class TimerState {
             this.heartbeatInterval = setInterval(() => {
                 this.silentSync();
             }, 60000);
-        }, 10000);
+        }, 5000);
         // this.heartbeatInterval = setInterval(() => {
         //     this.silentSync();
         // }, 60000);
     }
 
     private async silentSync() {
+        if (!this.currentDate) return;
         try {
             await fetch('/api/timer', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'sync',
                     date: this.currentDate,

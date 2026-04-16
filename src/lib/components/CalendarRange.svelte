@@ -7,8 +7,19 @@
 	import { clickOutside } from "$lib/actions/clickOutside";
 
 	// --- PROPS (Svelte 5) ---
+	interface Props {
+		rangeStart: Date;
+		rangeEnd: Date;
+		onRangeComplete?: (start: Date, end: Date) => void;
+	}
+
 	// We use "bindable" so the parent (Timer Page) updates automatically
-	let { rangeStart = $bindable(), rangeEnd = $bindable() } = $props();
+	// let { rangeStart = $bindable(), rangeEnd = $bindable() } = $props();
+	let {
+		rangeStart = $bindable(),
+		rangeEnd = $bindable(),
+		onRangeComplete,
+	}: Props = $props();
 
 	// --- INTERNAL UI STATE ---
 	let isCalendarOpen = $state(false);
@@ -57,9 +68,11 @@
 		return `${rangeStart.toLocaleDateString("en-ID", startOpt)} - ${rangeEnd.toLocaleDateString("en-ID", opt)}`;
 	});
 
-	// --- SELECTION LOGIC --- [cite: 27]
+	// --- SELECTION LOGIC ---
 	const handleDateClick = (date: Date) => {
 		const clickedDate = new Date(date);
+		const startStr = rangeStart.toDateString();
+		const clickedStr = clickedDate.toDateString();
 
 		if (!isSelecting) {
 			// FIRST CLICK: Always start a fresh selection
@@ -67,18 +80,35 @@
 			rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
 			isSelecting = true;
 		} else {
-			// SECOND CLICK: Decide whether to close or extend
-			if (clickedDate.toDateString() === rangeStart.toDateString()) {
-				// Clicked same date: Close as single day
+			// // SECOND CLICK: Decide whether to close or extend
+			// if (clickedDate.toDateString() === rangeStart.toDateString()) {
+			// 	// Clicked same date: Close as single day
+			// 	isCalendarOpen = false;
+			// 	isSelecting = false;
+			// } else if (clickedDate > rangeStart) {
+			// 	// Clicked later date: Complete range and close
+			// 	rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
+			// 	isCalendarOpen = false;
+			// 	isSelecting = false;
+			// } else {
+			// 	// Clicked earlier date: Treat as new start point
+			// 	rangeStart = new Date(clickedDate.setHours(0, 0, 0, 0));
+			// 	rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
+			// 	isSelecting = true;
+			// }
+			if (clickedStr === startStr) {
+				// Finish Single Day
 				isCalendarOpen = false;
 				isSelecting = false;
+				if (onRangeComplete) onRangeComplete(rangeStart, rangeEnd);
 			} else if (clickedDate > rangeStart) {
-				// Clicked later date: Complete range and close
+				// Finish Range
 				rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
 				isCalendarOpen = false;
 				isSelecting = false;
+				if (onRangeComplete) onRangeComplete(rangeStart, rangeEnd);
 			} else {
-				// Clicked earlier date: Treat as new start point
+				// Reset Start Point
 				rangeStart = new Date(clickedDate.setHours(0, 0, 0, 0));
 				rangeEnd = new Date(clickedDate.setHours(23, 59, 59, 999));
 				isSelecting = true;
@@ -87,23 +117,23 @@
 	};
 </script>
 
-<div class="relative">
+<div>
 	<button
 		onclick={() => (isCalendarOpen = !isCalendarOpen)}
 		class="px-4 py-2 hover:bg-zinc-50 rounded-2xl transition-all flex items-center gap-2 group"
 	>
+		<CalendarIcon size={14} />
 		<span
-			class="text-sm font-black uppercase tracking-widest text-zinc-900 group-hover:text-zinc-500 transition-colors"
+			class="text-sm text-zinc-900 group-hover:text-zinc-500 transition-colors"
 		>
 			{rangeLabel()}
 		</span>
-		<CalendarIcon size={14} class="text-zinc-400" />
 	</button>
 
 	{#if isCalendarOpen}
 		<div
 			use:clickOutside={() => (isCalendarOpen = false)}
-			class="absolute top-full left-0 mt-4 p-6 bg-white border border-zinc-100 shadow-2xl rounded-[32px] z-[100] w-80 animate-in fade-in zoom-in-95 duration-200"
+			class="absolute top-full left-0 p-6 bg-white border border-zinc-100 shadow-2xl rounded-[32px] z-[100] w-80 animate-in fade-in zoom-in-95 duration-200"
 		>
 			<div class="flex items-center justify-between mb-4 px-2">
 				<span class="text-xs font-black uppercase tracking-widest">

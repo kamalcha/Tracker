@@ -3,8 +3,8 @@ import { pgTable, serial, text, timestamp, integer, unique, boolean } from 'driz
 export const organizations = pgTable('organizations', {
     id: serial('id').primaryKey(),
     name: text('name').notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 export const users = pgTable('users', {
@@ -16,8 +16,8 @@ export const users = pgTable('users', {
     organizationId: integer('organization_id')
         .notNull()
         .references(() => organizations.id),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
     status: text('status').$type<'Active' | 'Inactive' | 'Pending'>().default('Active').notNull(),
 });
 
@@ -28,7 +28,7 @@ export const invitations = pgTable('invitations', {
         .notNull()
         .references(() => organizations.id),
     expiresAt: timestamp('expires_at').notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 export const timeLogs = pgTable('time_logs', {
@@ -65,7 +65,7 @@ export const projects = pgTable('projects', {
         .notNull()
         .references(() => users.id),
     isArchived: boolean('is_archived').default(false).notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 export const tasks = pgTable('tasks', {
@@ -79,5 +79,5 @@ export const tasks = pgTable('tasks', {
     status: text('status').default('Todo').notNull(),
     completed: boolean('completed').default(false).notNull(),
     isArchived: boolean('is_archived').default(false).notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
