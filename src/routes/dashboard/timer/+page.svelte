@@ -36,7 +36,6 @@
 	let editingDay = $state<string | null>(null);
 	let editH = $state(0);
 	let editM = $state(0);
-	let editS = $state(0);
 	let isShaking = $state(false);
 	// let rangeStart = $state<Date>(getStartOfWeek(new Date()));
 	// let rangeEnd = $state<Date>(getEndOfWeek(new Date()));
@@ -56,7 +55,7 @@
 	let activeProjectDropdown = $state<number | null>(null);
 	let projectSearch = $state("");
 
-	let totalEditSeconds = $derived(editH * 3600 + editM * 60 + editS);
+	let totalEditSeconds = $derived(editH * 3600 + editM * 60);
 	let isOverLimit = $derived(totalEditSeconds > 86400);
 
 	// 1. CALCULATE SAVED TIME SUMMARY
@@ -101,15 +100,13 @@
 	const formatHMS = (totalSeconds: number) => {
 		const h = Math.floor(totalSeconds / 3600);
 		const m = Math.floor((totalSeconds % 3600) / 60);
-		const s = totalSeconds % 60;
-		return `${h}h ${m}m ${s}s`;
+		return `${h}h ${m}m`;
 	};
 
 	const startEditing = (day: any) => {
 		editingDay = day.date;
 		editH = Math.floor(day.totalSeconds / 3600);
 		editM = Math.floor((day.totalSeconds % 3600) / 60);
-		editS = day.totalSeconds % 60;
 	};
 
 	// Helper to find today's specific log card
@@ -384,14 +381,6 @@
 									: 'border-zinc-200'} rounded-lg text-center"
 							/>
 							<span class="text-xs">m</span>
-							<input
-								type="number"
-								bind:value={editS}
-								class="w-12 bg-white border {isOverLimit
-									? 'border-red-500'
-									: 'border-zinc-200'} rounded-lg text-center"
-							/>
-							<span class="text-xs">s</span>
 						</div>
 					{:else}
 						<p

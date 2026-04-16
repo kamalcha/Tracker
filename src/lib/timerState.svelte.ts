@@ -5,6 +5,7 @@ class TimerState {
     status = $state<'idle' | 'working'>('idle');
     seconds = $state(0);
     currentDate = $state<string>('');
+    isStopping = $state(false);
     private interval: any = null;
 
     // Derived state for the Visual Nudge
@@ -22,20 +23,20 @@ class TimerState {
         const savedStart = localStorage.getItem('punch_clock_start');
         if (!savedStart) return;
 
-        const start = new Date(savedStart);
-        const now = new Date();
-        const startDay = start.toLocaleDateString('en-CA');
-        const today = now.toLocaleDateString('en-CA');
+        // const start = new Date(savedStart);
+        // const now = new Date();
+        // const startDay = start.toLocaleDateString('en-CA');
+        // const today = now.toLocaleDateString('en-CA');
 
-        // --- THE MIDNIGHT CATCH-UP ---
-        // If the browser was closed over one or more midnights
-        if (startDay !== today) {
-            await this.catchUpMissingDays(start, now);
-        } else {
-            this.currentDate = startDay;
-            this.seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
-            this.resume(this.seconds, startDay);
-        }
+        // // --- THE MIDNIGHT CATCH-UP ---
+        // // If the browser was closed over one or more midnights
+        // if (startDay !== today) {
+        //     await this.catchUpMissingDays(start, now);
+        // } else {
+        //     this.currentDate = startDay;
+        //     this.seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
+        //     this.resume(this.seconds, startDay);
+        // }
 
         // if (savedStart) {
         //     const start = new Date(savedStart);
@@ -126,13 +127,16 @@ class TimerState {
     //         }
     //     }, 1000);
     resume(initialSeconds: number, date: string) {
+        if (this.isStopping) return;
         this.seconds = initialSeconds;
         this.currentDate = date;
         this.status = 'working';
 
-        if (this.tickInterval) clearInterval(this.tickInterval);
-        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-        if (this.intentTimeout) clearTimeout(this.intentTimeout);
+        this.clearTimers();
+
+        // if (this.tickInterval) clearInterval(this.tickInterval);
+        // if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        // if (this.intentTimeout) clearTimeout(this.intentTimeout);
 
         // 1. THE TICKER: Updates the UI every second
         this.tickInterval = setInterval(() => {
@@ -186,6 +190,7 @@ class TimerState {
     }
 
     async stop() {
+        this.isStopping = true;
         await fetch('/api/timer', {
             method: 'POST',
             body: JSON.stringify({ action: 'stop', date: this.currentDate })
@@ -195,12 +200,20 @@ class TimerState {
     }
 
     reset() {
+        // if (this.tickInterval) clearInterval(this.tickInterval);
+        // if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        // if (this.intentTimeout) clearTimeout(this.intentTimeout);
+        this.clearTimers();
+        this.status = 'idle';
+        this.seconds = 0;
+        this.isStopping = false;
+        localStorage.removeItem('punch_clock_start');
+    }
+
+    private clearTimers() {
         if (this.tickInterval) clearInterval(this.tickInterval);
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         if (this.intentTimeout) clearTimeout(this.intentTimeout);
-        this.status = 'idle';
-        this.seconds = 0;
-        localStorage.removeItem('punch_clock_start');
     }
 
     private async handleMidnight(newDate: string) {

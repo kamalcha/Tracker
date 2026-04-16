@@ -190,7 +190,8 @@ async function fetchAndGroup(userId: number, startDate: string, endDate: string,
         const taskDate = task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-CA', { timeZone: tz }) : '';
         if (taskDate) {
             if (!groupedData[taskDate]) {
-                groupedData[taskDate] = { date: taskDate, totalSeconds: 0, isManual: false, calculatedSum: 0, entries: [], dayTasks: [] };
+                const manualTotal = summaryMap.get(taskDate);
+                groupedData[taskDate] = { date: taskDate, totalSeconds: manualTotal ?? 0, isManual: manualTotal !== undefined, calculatedSum: 0, entries: [], dayTasks: [] };
             }
             groupedData[taskDate].dayTasks.push(task);
         }
@@ -354,22 +355,32 @@ export const actions = {
     // BULK DELETE & WIPE DAY PROTOCOL
     deleteBulk: async ({ request, cookies }) => {
         const userId = Number(cookies.get('user_id'));
+        const userTz = cookies.get('user_timezone') || 'Asia/Jakarta';
         const data = await request.formData();
         const taskIds = data.get('taskIds')?.toString().split(',').filter(Boolean).map(Number) || [];
         const wipeDates = data.get('wipeDates')?.toString().split(',').filter(Boolean) || [];
 
-        // 1. Delete selected Tasks 
+        if (wipeDates.length > 0) {
+            await db.delete(timeLogs).where(and(eq(timeLogs.userId, userId), inArray(timeLogs.date, wipeDates)));
+            await db.delete(dailySummaries).where(and(eq(dailySummaries.userId, userId), inArray(dailySummaries.date, wipeDates)));
+        }
+
         if (taskIds.length > 0) {
+            await db.update(timeLogs)
+                .set({ taskId: null })
+                .where(and(eq(timeLogs.userId, userId), inArray(timeLogs.taskId, taskIds)));
+
+            // 3. NOW SAFE TO DELETE INDIVIDUAL TASKS
             await db.delete(tasks).where(inArray(tasks.id, taskIds));
         }
 
-        // 2. Wipe Day (Logs and Summaries) if Date Checkbox was used 
         if (wipeDates.length > 0) {
-            // Delete all time logs for these dates
-            await db.delete(timeLogs).where(and(eq(timeLogs.userId, userId), inArray(timeLogs.date, wipeDates)));
-
-            // Delete all daily summaries for these dates
-            await db.delete(dailySummaries).where(and(eq(dailySummaries.userId, userId), inArray(dailySummaries.date, wipeDates)));
+            for (const date of wipeDates) {
+                await db.delete(tasks).where(and(
+                    eq(tasks.userId, userId),
+                    sql`DATE(${tasks.createdAt} AT TIME ZONE ${userTz}) = ${date}`
+                ));
+            }
         }
 
         // Delete ALL tasks for these dates (including archived) to prevent orphans
