@@ -183,7 +183,7 @@
 									<button
 										type="submit"
 										disabled={isArchiveTab}
-										class="size-5 rounded-md border-2 transition-all {task.completed
+										class="size-5 rounded-xl border-2 transition-all {task.completed
 											? 'bg-emerald-500 border-emerald-500 text-white'
 											: 'border-zinc-200'} flex items-center justify-center shrink-0 disabled:opacity-50"
 										>{#if task.completed}<Check
