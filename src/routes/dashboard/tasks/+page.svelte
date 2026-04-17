@@ -504,7 +504,11 @@
 										/>
 										<button
 											type="submit"
-											class="p-2 text-zinc-300 hover:text-zinc-900 transition-colors"
+											disabled={selectedIds.length > 0}
+											class="p-2 transition-colors {selectedIds.length >
+											0
+												? 'text-zinc-200 cursor-not-allowed'
+												: 'text-zinc-300 hover:text-zinc-900'}"
 											>{#if isArchiveTab}<RotateCcw
 													size={14}
 												/>{:else}<Archive
@@ -534,7 +538,11 @@
 									/>
 									<button
 										type="submit"
-										class="p-2 text-zinc-300 hover:text-red-500 transition-colors"
+										disabled={selectedIds.length > 0}
+										class="p-2 transition-colors {selectedIds.length >
+										0
+											? 'text-zinc-200 cursor-not-allowed'
+											: 'text-zinc-300 hover:text-red-500'}"
 										><Trash2 size={14} /></button
 									>
 								</form>

@@ -498,7 +498,12 @@
 							<input type="hidden" name="ids" value={task.id} />
 							<button
 								type="submit"
-								class="p-2 text-zinc-200 hover:text-red-500 transition-all opacity-0 group-hover/task:opacity-100"
+								disabled={selectedTaskIds.length > 0 ||
+									selectedDates.length > 0}
+								class="p-2 transition-all opacity-0 group-hover/task:opacity-100 {selectedTaskIds.length >
+									0 || selectedDates.length > 0
+									? 'text-zinc-100 cursor-not-allowed'
+									: 'text-zinc-200 hover:text-red-500'}"
 							>
 								<Trash2 size={20} />
 							</button>
