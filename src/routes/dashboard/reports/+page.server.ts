@@ -89,6 +89,7 @@ export const load = async ({ cookies, url }) => {
         chartData.push({
             day: `${dayOfWeekStr}\n${dateStrShort}`,
             date: currentDate.toLocaleDateString('en-US', fullDateOpt),
+            rawDate: dateStr,
             logged: seconds / 3600
         });
         
@@ -120,12 +121,13 @@ export const load = async ({ cookies, url }) => {
     if (!avgDailyHours) avgDailyHours = "0h";
 
     // 3. Breakdown Fetch constraints (Tasks created in range)
-    const allTasks = await db.select({
+    const allTasksRaw = await db.select({
         id: tasks.id, 
         name: tasks.name, 
         status: tasks.status, 
         projectId: tasks.projectId, 
-        projectName: projects.name
+        projectName: projects.name,
+        createdAt: tasks.createdAt
     })
     .from(tasks)
     .leftJoin(projects, eq(tasks.projectId, projects.id))
@@ -136,6 +138,18 @@ export const load = async ({ cookies, url }) => {
         lte(sql`DATE(${tasks.createdAt} AT TIME ZONE ${userTz})`, endDate),
         sql`(${tasks.projectId} IS NULL OR ${projects.isArchived} = false)`
     )).orderBy(asc(tasks.id));
+
+    const allTasks = allTasksRaw.map(t => {
+        const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-CA', { timeZone: userTz }) : '';
+        return {
+            id: t.id,
+            name: t.name,
+            status: t.status,
+            projectId: t.projectId,
+            projectName: t.projectName,
+            rawDate: dateStr
+        };
+    });
 
     // Calculate Projects breakdown counts
     const userProjects = await db.select().from(projects).where(and(eq(projects.userId, userId), eq(projects.isArchived, false))).orderBy(asc(projects.name));

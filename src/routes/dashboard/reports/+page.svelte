@@ -90,10 +90,34 @@
 	};
 
 	// --- Handlers ---
-	function handleExport() {
-		console.log("Mock Export Triggered! Generating CSV...");
-		alert("Mock: Exporting CSV...");
-	}
+	const exportCSV = () => {
+		let csvContent = "Project,Task Name,Task Status\n";
+
+		chartData.forEach((day) => {
+			const formattedTime = formatDecimalHours(day.logged);
+			
+			// Inject merged row separator for Date grouping
+			csvContent += `"${day.date} - ${formattedTime}",,\n`;
+
+			const dayTasks = mockTasks.filter((t) => t.rawDate === day.rawDate);
+			
+			dayTasks.forEach((task) => {
+				const projName = task.projectName || "Unassigned";
+				// Escape double quotes specifically tracking CSV syntax
+				const taskName = task.name.replace(/"/g, '""');
+				csvContent += `"${projName}","${taskName}","${task.status}"\n`;
+			});
+		});
+
+		const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.setAttribute("href", url);
+		link.setAttribute("download", `Report_${data.filters.startDate}_to_${data.filters.endDate}.csv`);
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+	};
 
 	const updateTimeWindow = (start: Date, end: Date) => {
 		const s = start.toLocaleDateString("en-CA");
@@ -158,7 +182,7 @@
 		</nav>
 
 		<button
-			onclick={handleExport}
+			onclick={exportCSV}
 			class="flex items-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl text-sm font-bold transition-all shadow-md focus:ring-4 focus:ring-zinc-900/20"
 		>
 			<Download size={18} />
