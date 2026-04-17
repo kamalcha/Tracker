@@ -120,7 +120,10 @@
 		let total = day.totalSeconds;
 		// If this is the "Today" card and the timer is running, add live seconds
 		if (day.date === todayStr && timer.status === "working") {
-			total += timer.seconds;
+			// Strip leftover seconds from the day's base total so the display
+			// minutes flip exactly when the timer crosses the 60-second mark.
+			const baseMinutesOnly = Math.floor(total / 60) * 60;
+			total = baseMinutesOnly + timer.seconds;
 		}
 		return total;
 	};
