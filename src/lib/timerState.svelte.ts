@@ -16,7 +16,10 @@ class TimerState {
     private intentTimeout: any = null;
 
     constructor() {
-        if (browser) this.init();
+        if (browser) {
+            // KILL SWITCH: Stops pulses immediately when tab closes
+            window.addEventListener('beforeunload', () => this.clearTimers());
+        }
     }
 
     private async init() {
@@ -145,6 +148,8 @@ class TimerState {
             if (today !== this.currentDate) this.handleMidnight(today);
         }, 1000);
 
+        this.silentSync();
+
         // 2. The Heartbeat
         // Stage 1: Wait 10 seconds to confirm user intent [cite: 26, 27]
         this.intentTimeout = setTimeout(async () => {
@@ -155,9 +160,6 @@ class TimerState {
                 this.silentSync();
             }, 60000);
         }, 5000);
-        // this.heartbeatInterval = setInterval(() => {
-        //     this.silentSync();
-        // }, 60000);
     }
 
     private async silentSync() {
@@ -195,8 +197,8 @@ class TimerState {
             method: 'POST',
             body: JSON.stringify({ action: 'stop', date: this.currentDate })
         });
-        this.reset();
         if (browser) await invalidateAll();
+        this.reset();
     }
 
     reset() {

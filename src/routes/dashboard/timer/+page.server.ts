@@ -182,7 +182,9 @@ async function fetchAndGroup(userId: number, startDate: string, endDate: string,
             groupedData[log.date] = { date: log.date, totalSeconds: manualTotal ?? 0, isManual: manualTotal !== undefined, calculatedSum: 0, entries: [], dayTasks: [] };
         }
         groupedData[log.date].entries.push(log);
-        groupedData[log.date].calculatedSum += (log.duration || 0);
+        if (log.endTime !== null) {
+            groupedData[log.date].calculatedSum += (log.duration || 0);
+        }
         if (!groupedData[log.date].isManual) groupedData[log.date].totalSeconds = groupedData[log.date].calculatedSum;
     });
 
