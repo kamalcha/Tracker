@@ -269,6 +269,27 @@ export const load = async ({ cookies, url }) => {
 };
 
 export const actions = {
+    createProject: async ({ request, cookies }) => {
+        const userId = Number(cookies.get('user_id'));
+        const data = await request.formData();
+        const name = data.get('name')?.toString();
+        const taskId = Number(data.get('taskId'));
+
+        if (!name) return fail(400);
+
+        const [newProject] = await db.insert(projects)
+            .values({ name, userId, isArchived: false })
+            .returning();
+
+        if (taskId) {
+            await db.update(tasks)
+                .set({ projectId: newProject.id })
+                .where(eq(tasks.id, taskId));
+        }
+
+        return { success: true, newProject, taskId };
+    },
+
     // Action to create a task from the header
     createTask: async ({ request, cookies }) => {
         const userId = Number(cookies.get('user_id'));

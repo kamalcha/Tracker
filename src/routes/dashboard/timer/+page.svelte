@@ -24,6 +24,7 @@
 	import { invalidateAll } from "$app/navigation";
 	import CalendarRange from "$lib/components/CalendarRange.svelte";
 	import { getStatusDetails, formatHMS, getStartOfWeek, getEndOfWeek } from "$lib/utils";
+	import { clickOutside } from "$lib/actions/clickOutside";
 
 	let { data } = $props();
 
@@ -52,6 +53,7 @@
 	let activeStatusDropdown = $state<number | null>(null);
 	let activeProjectDropdown = $state<number | null>(null);
 	let projectSearch = $state("");
+	let newProjectName = $state("");
 
 	let totalEditSeconds = $derived(editH * 3600 + editM * 60);
 	let isOverLimit = $derived(totalEditSeconds > 86400);
@@ -383,26 +385,95 @@
 						</button>
 						<div>
 							<h4 class="font-bold text-zinc-900">{task.name}</h4>
-							<div
-								class="relative flex items-center gap-1.5 mt-1"
-							>
-								<button
-									onclick={() => {
-										activeStatusDropdown = null;
-										activeProjectDropdown =
-											activeProjectDropdown === task.id
-												? null
-												: task.id;
-									}}
-									class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-100 text-[10px] font-bold uppercase text-zinc-500 hover:border-zinc-900"
+							<div class="relative flex items-center gap-1.5 mt-1">
+								<div
+									class="relative"
+									use:clickOutside={() => { if (activeProjectDropdown === task.id) activeProjectDropdown = null; }}
 								>
-									<Briefcase size={12} />
-									<span
-										>{task.projectName ||
-											"Unassigned"}</span
+									<button
+										onclick={() => {
+											activeProjectDropdown =
+												activeProjectDropdown === task.id ? null : task.id;
+										}}
+										class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-100 text-[10px] font-bold uppercase text-zinc-500 hover:border-zinc-900"
 									>
-									<ChevronDown size={10} />
-								</button>
+										<Briefcase size={12} />
+										<span>{task.projectName || "Unassigned"}</span>
+										<ChevronDown size={10} />
+									</button>
+
+									{#if activeProjectDropdown === task.id}
+										<div class="absolute left-0 top-full mt-2 w-56 bg-white border border-zinc-100 shadow-2xl rounded-2xl z-50 overflow-hidden">
+											<div class="p-2 border-b border-zinc-50 flex gap-2 bg-zinc-50">
+												<Search size={12} class="text-zinc-400" />
+												<input
+													type="text"
+													bind:value={projectSearch}
+													placeholder="Filter projects..."
+													class="bg-transparent text-xs outline-none w-full font-bold"
+												/>
+											</div>
+											<div class="max-h-48 overflow-auto py-1 scrollbar-thin">
+												<form
+													action="?/updateTask"
+													method="POST"
+													use:enhance={() => {
+														task.projectName = null;
+														task.projectId = null;
+														activeProjectDropdown = null;
+													}}
+												>
+													<input type="hidden" name="id" value={task.id} />
+													<input type="hidden" name="projectId" value="" />
+													<button type="submit" class="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-zinc-50 transition-colors text-zinc-400 italic">Unassign Project</button>
+												</form>
+												{#each filteredProjects as p}
+													<form
+														action="?/updateTask"
+														method="POST"
+														use:enhance={() => {
+															task.projectName = p.name;
+															task.projectId = p.id;
+															activeProjectDropdown = null;
+														}}
+													>
+														<input type="hidden" name="id" value={task.id} />
+														<input type="hidden" name="projectId" value={p.id} />
+														<button type="submit" class="w-full text-left px-4 py-2.5 text-xs font-bold hover:bg-zinc-50 truncate transition-colors">{p.name}</button>
+													</form>
+												{/each}
+											</div>
+											<div class="p-2 border-t border-zinc-50 bg-zinc-50/50">
+												<form
+													action="?/createProject"
+													method="POST"
+													use:enhance={() => {
+														return async ({ result }) => {
+															if (result.type === "success" && result.data) {
+																const { newProject } = result.data as any;
+																task.projectName = newProject.name;
+																task.projectId = newProject.id;
+																newProjectName = "";
+																activeProjectDropdown = null;
+															}
+														};
+													}}
+												>
+													<input type="hidden" name="taskId" value={task.id} />
+													<div class="flex items-center gap-2 px-2 py-1 bg-white rounded-lg border border-zinc-200">
+														<Plus size={10} class="text-zinc-400" />
+														<input
+															name="name"
+															bind:value={newProjectName}
+															placeholder="New project..."
+															class="text-[10px] font-black uppercase outline-none w-full"
+														/>
+													</div>
+												</form>
+											</div>
+										</div>
+									{/if}
+								</div>
 							</div>
 						</div>
 					</div>

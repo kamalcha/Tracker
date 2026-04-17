@@ -17,6 +17,7 @@
 	} from "lucide-svelte";
 	import { enhance } from "$app/forms";
 	import { getStatusDetails } from "$lib/utils";
+	import { clickOutside } from "$lib/actions/clickOutside";
 
 	let { data } = $props();
 
@@ -239,7 +240,10 @@
 										/>{/if}
 								</div>
 							{:else}
-								<div class="relative">
+								<div
+									class="relative"
+									use:clickOutside={() => { if (activeProjectDropdown === task.id) activeProjectDropdown = null; }}
+								>
 									<button
 										onclick={() =>
 											(activeProjectDropdown =
@@ -415,7 +419,10 @@
 									{task.status}
 								</div>
 							{:else}
-								<div class="relative">
+								<div
+									class="relative"
+									use:clickOutside={() => { if (activeStatusDropdown === task.id) activeStatusDropdown = null; }}
+								>
 									<button
 										onclick={() =>
 											(activeStatusDropdown =
