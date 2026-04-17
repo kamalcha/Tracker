@@ -23,6 +23,7 @@
 	import { enhance } from "$app/forms";
 	import { invalidateAll } from "$app/navigation";
 	import CalendarRange from "$lib/components/CalendarRange.svelte";
+	import { getStatusDetails, formatHMS, getStartOfWeek, getEndOfWeek } from "$lib/utils";
 
 	let { data } = $props();
 
@@ -43,9 +44,6 @@
 	let rangeEnd = $state(new Date(data.filters.endDate));
 	// Update rangeStart/End when data changes (navigation occurs)
 	$effect(() => {
-		if (data.activeTimer && timer.status === "idle") {
-			timer.resume(data.activeTimer.seconds, data.activeTimer.date);
-		}
 		rangeStart = new Date(data.filters.startDate);
 		rangeEnd = new Date(data.filters.endDate);
 	});
@@ -97,12 +95,6 @@
 	// Helper for Today's Date String
 	const todayStr = new Date().toLocaleDateString("en-CA");
 
-	const formatHMS = (totalSeconds: number) => {
-		const h = Math.floor(totalSeconds / 3600);
-		const m = Math.floor((totalSeconds % 3600) / 60);
-		return `${h}h ${m}m`;
-	};
-
 	const startEditing = (day: any) => {
 		editingDay = day.date;
 		editH = Math.floor(day.totalSeconds / 3600);
@@ -127,26 +119,6 @@
 		}
 		return total;
 	};
-
-	// --- DATE HELPERS ---
-	function getStartOfWeek(d: Date) {
-		const date = new Date(d);
-		const day = date.getDay(); // 0 is Sunday
-		const diff = date.getDate() - day;
-		return new Date(new Date(date.setDate(diff)).setHours(0, 0, 0, 0));
-	}
-
-	function getEndOfWeek(d: Date) {
-		const start = getStartOfWeek(d);
-		return new Date(
-			new Date(start.setDate(start.getDate() + 6)).setHours(
-				23,
-				59,
-				59,
-				999,
-			),
-		);
-	}
 
 	const updateTimeWindow = (start: Date, end: Date) => {
 		const s = start.toLocaleDateString("en-CA");
@@ -187,24 +159,11 @@
 		updateTimeWindow(s, e);
 	};
 
-	// const goToday = () => {
-	// 	const today = new Date();
-	// 	const tStart = getStartOfWeek(today);
-	// 	const tEnd = getEndOfWeek(today);
-	// 	if (
-	// 		rangeStart.toDateString() === tStart.toDateString() &&
-	// 		rangeEnd.toDateString() === tEnd.toDateString()
-	// 	) {
-	// 		triggerShake();
-	// 		return;
-	// 	}
-	// 	rangeStart = tStart;
-	// 	rangeEnd = tEnd;
-	// };
 	const goToday = () => {
 		const today = new Date();
 		const tStart = getStartOfWeek(today);
-		if (rangeStart.toDateString() === tStart.toDateString()) {
+		const tEnd = getEndOfWeek(today);
+		if (rangeStart.toDateString() === tStart.toDateString() && rangeEnd.toDateString() === tEnd.toDateString()) {
 			triggerShake();
 			return;
 		}
@@ -249,35 +208,6 @@
 
 	const isToday = (dateStr: string) => {
 		return dateStr === new Date().toLocaleDateString("en-CA");
-	};
-
-	const getStatusDetails = (status: string) => {
-		switch (status) {
-			case "In Progress":
-				return {
-					icon: Loader,
-					color: "text-blue-500",
-					bg: "bg-blue-50",
-				};
-			case "Blocked":
-				return {
-					icon: CircleAlert,
-					color: "text-amber-500",
-					bg: "bg-amber-50",
-				};
-			case "Done":
-				return {
-					icon: CircleCheck,
-					color: "text-emerald-500",
-					bg: "bg-emerald-50",
-				};
-			default:
-				return {
-					icon: CircleDashed,
-					color: "text-slate-400",
-					bg: "bg-slate-50",
-				};
-		}
 	};
 
 	// Helper for date-level selection
@@ -479,20 +409,12 @@
 
 					<div class="flex items-center gap-4">
 						<div class="relative">
-							<button
-								onclick={() => {
-									activeProjectDropdown = null;
-									activeStatusDropdown =
-										activeStatusDropdown === task.id
-											? null
-											: task.id;
-								}}
+							<div
 								class="flex items-center gap-2 text-xs font-bold {details.color}"
 							>
 								<details.icon size={14} strokeWidth={2.5} />
 								{task.status}
-								<ChevronDown size={14} />
-							</button>
+							</div>
 						</div>
 						<form action="?/deleteTasks" method="POST" use:enhance>
 							<input type="hidden" name="ids" value={task.id} />

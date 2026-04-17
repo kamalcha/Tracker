@@ -16,6 +16,7 @@
 		Lock,
 	} from "lucide-svelte";
 	import { enhance } from "$app/forms";
+	import { getStatusDetails } from "$lib/utils";
 
 	let { data } = $props();
 
@@ -79,18 +80,6 @@
 		toastTimer = setTimeout(() => (toastVisible = false), 6000);
 	}
 
-	const getStatusDetails = (status: string) => {
-		switch (status) {
-			case "In Progress":
-				return { icon: Loader, color: "text-blue-500" };
-			case "Blocked":
-				return { icon: CircleAlert, color: "text-amber-500" };
-			case "Done":
-				return { icon: CircleCheck, color: "text-emerald-500" };
-			default:
-				return { icon: CircleDashed, color: "text-zinc-400" };
-		}
-	};
 </script>
 
 <div class="flex flex-col h-screen bg-white overflow-hidden">

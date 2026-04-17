@@ -16,6 +16,13 @@
 
 	let { children, data } = $props();
 
+	// Global check to resume timer if navigating across pages
+	$effect(() => {
+		if (data.activeTimer && timer.status === "idle") {
+			timer.resume(data.activeTimer.seconds, data.activeTimer.date);
+		}
+	});
+
 	// Helper to highlight the active link
 	const isActive = (path: string) => page.url.pathname.includes(path);
 </script>

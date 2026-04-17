@@ -14,6 +14,7 @@
 	import * as Chart from "$lib/components/ui/chart/index.js";
 	import { BarChart } from "layerchart";
 	import { goto } from "$app/navigation";
+	import { getStatusDetails, getStartOfWeek, getEndOfWeek } from "$lib/utils";
 
 	let { data } = $props();
 
@@ -61,8 +62,19 @@
 	// Breakdown Toggle
 	let breakdownGroupBy = $state<"Projects" | "Tasks">("Projects");
 
-	// Collapsible State
+	// Collapsible & Animation State
 	let expandedProjects = $state<(number | null)[]>([]);
+	let isShaking = $state(false);
+
+	const triggerShake = () => {
+		isShaking = false;
+		setTimeout(() => {
+			isShaking = true;
+			setTimeout(() => {
+				isShaking = false;
+			}, 300);
+		}, 10);
+	};
 
 	function toggleProject(id: number | null) {
 		if (expandedProjects.includes(id)) {
@@ -75,19 +87,6 @@
 	// Mock Breakdown Details
 	const mockProjects = $derived(data.projects);
 	const mockTasks = $derived(data.tasks);
-
-	const getStatusDetails = (status: string) => {
-		switch (status) {
-			case "In Progress":
-				return { icon: Loader, color: "text-blue-500" };
-			case "Blocked":
-				return { icon: CircleAlert, color: "text-amber-500" };
-			case "Done":
-				return { icon: CircleCheck, color: "text-emerald-500" };
-			default:
-				return { icon: CircleDashed, color: "text-zinc-400" };
-		}
-	};
 
 	// --- Handlers ---
 	const exportCSV = () => {
@@ -142,6 +141,13 @@
 	};
 
 	const goToday = () => {
+		const today = new Date();
+		const tStart = getStartOfWeek(today);
+		const tEnd = getEndOfWeek(today);
+		if (rangeStart.toDateString() === tStart.toDateString() && rangeEnd.toDateString() === tEnd.toDateString()) {
+			triggerShake();
+			return;
+		}
 		goto("?", { noScroll: true });
 	};
 </script>
@@ -175,7 +181,7 @@
 			</div>
 			<button
 				onclick={goToday}
-				class="px-5 py-2 bg-zinc-900 text-white rounded-4xl text-[14px] transition-all hover:bg-zinc-800"
+				class="px-5 py-2 bg-zinc-900 text-white rounded-4xl text-[14px] transition-all hover:bg-zinc-800 {isShaking ? 'shake-anim' : ''}"
 			>
 				Today
 			</button>
@@ -360,7 +366,7 @@
 								>Project</th
 							>
 							<th
-								class="w-24 px-6 py-4 text-center border-b border-zinc-100 rounded-tr-2xl"
+								class="w-32 px-6 py-4 text-left border-b border-zinc-100 rounded-tr-2xl"
 								>Task Status</th
 							>
 						{/if}
@@ -443,9 +449,12 @@
 											{task.name}
 										</td>
 										<td
-											class="px-4 pr-10 text-right py-3 text-[10px] uppercase font-black tracking-widest text-zinc-400"
+											class="px-4 pr-10 text-left py-3"
 										>
-											{task.status}
+											<div class="flex items-center gap-2 text-xs font-bold {details.color}">
+												<details.icon size={14} strokeWidth={2.5} />
+												{task.status}
+											</div>
 										</td>
 									</tr>
 								{/each}
@@ -486,16 +495,11 @@
 										{/if}
 									</div>
 								</td>
-								<td class="py-4 px-6 text-center">
-									<div
-										class="flex justify-center text-zinc-400 group-hover:text-zinc-600 transition-colors"
-									>
-										<details.icon
-											size={18}
-											class={details.color}
-											strokeWidth={2.5}
-										/>
-									</div>
+								<td class="py-4 px-6 text-left">
+											<div class="flex items-center gap-2 text-xs font-bold {details.color}">
+												<details.icon size={14} strokeWidth={2.5} />
+												{task.status}
+											</div>
 								</td>
 							</tr>
 						{/each}

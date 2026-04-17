@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/db';
-import { users, organizations } from '$lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { users, organizations, timeLogs } from '$lib/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export const load = async ({ cookies }) => {
     const userId = cookies.get('user_id');
@@ -24,5 +24,22 @@ export const load = async ({ cookies }) => {
         throw redirect(303, '/login');
     }
 
-    return { user: userData };
+    // Global active timer session query
+    const [activeSession] = await db.select()
+        .from(timeLogs)
+        .where(and(eq(timeLogs.userId, Number(userId)), isNull(timeLogs.endTime)))
+        .limit(1);
+
+    let activeTimer = null;
+    if (activeSession) {
+        const startTime = new Date(activeSession.startTime).getTime();
+        const now = new Date().getTime();
+        activeTimer = {
+            date: activeSession.date,
+            seconds: Math.floor((now - startTime) / 1000),
+            lastSeenAt: activeSession.lastSeenAt
+        };
+    }
+
+    return { user: userData, activeTimer };
 };

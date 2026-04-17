@@ -2,17 +2,7 @@ import { db } from '$lib/db';
 import { timeLogs, dailySummaries, tasks, projects } from '$lib/db/schema';
 import { eq, and, gte, lte, asc, sql } from 'drizzle-orm';
 
-const getWeekBounds = (date: Date, tz: string) => {
-    const localDate = new Date(date.toLocaleString("en-US", { timeZone: tz }));
-    const sun = new Date(localDate);
-    sun.setDate(localDate.getDate() - localDate.getDay());
-    const sat = new Date(localDate);
-    sat.setDate(localDate.getDate() - localDate.getDay() + 6);
-    return {
-        start: sun.toLocaleDateString('en-CA'),
-        end: sat.toLocaleDateString('en-CA')
-    };
-};
+import { getWeekBounds } from '$lib/server/dateUtils';
 
 export const load = async ({ cookies, url }) => {
     const userId = Number(cookies.get('user_id'));

@@ -2,19 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/db';
 import { timeLogs, dailySummaries, tasks, projects } from '$lib/db/schema';
 import { desc, eq, and, sql, asc, inArray, gte, lte, isNull } from 'drizzle-orm';
-
-// Helper to calculate Sunday-Saturday bounds
-const getWeekBounds = (date: Date, tz: string) => {
-    const localDate = new Date(date.toLocaleString("en-US", { timeZone: tz }));
-    const sun = new Date(localDate);
-    sun.setDate(localDate.getDate() - localDate.getDay());
-    const sat = new Date(localDate);
-    sat.setDate(localDate.getDate() - localDate.getDay() + 6);
-    return {
-        start: sun.toLocaleDateString('en-CA'),
-        end: sat.toLocaleDateString('en-CA')
-    };
-};
+import { getWeekBounds } from '$lib/server/dateUtils';
 
 // export const load = async ({ cookies, url, locals }) => {
 //     const userId = Number(cookies.get('user_id'));
@@ -244,23 +232,6 @@ export const load = async ({ cookies, url }) => {
     const userId = Number(cookies.get('user_id'));
     const userTz = cookies.get('user_timezone') || 'Asia/Jakarta';
 
-    // 1. GLOBAL RECOVERY: Look for any open log regardless of date filter
-    const [activeSession] = await db.select()
-        .from(timeLogs)
-        .where(and(eq(timeLogs.userId, userId), isNull(timeLogs.endTime)))
-        .limit(1);
-
-    let activeTimer = null;
-    if (activeSession) {
-        const startTime = new Date(activeSession.startTime).getTime();
-        const now = new Date().getTime();
-        activeTimer = {
-            date: activeSession.date,
-            seconds: Math.floor((now - startTime) / 1000),
-            lastSeenAt: activeSession.lastSeenAt
-        };
-    }
-
     const startParam = url.searchParams.get('start');
     const endParam = url.searchParams.get('end');
 
@@ -293,8 +264,7 @@ export const load = async ({ cookies, url }) => {
         projects: userProjects,
         isFiltered: startParam !== null,
         headerWeekTotal: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-        filters: { startDate: archiveStart, endDate: archiveEnd },
-        activeTimer
+        filters: { startDate: archiveStart, endDate: archiveEnd }
     };
 };
 
