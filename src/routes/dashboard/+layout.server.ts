@@ -12,6 +12,7 @@ export const load = async ({ cookies }) => {
         name: users.name,
         email: users.email,
         role: users.role,
+        status: users.status,
         organizationName: organizations.name,
         organizationId: organizations.id
     })
@@ -20,6 +21,17 @@ export const load = async ({ cookies }) => {
         .where(eq(users.id, Number(userId)));
 
     if (!userData) {
+        cookies.delete('user_id', { path: '/' });
+        throw redirect(303, '/login');
+    }
+
+    // Managers must use the manager portal, not the employee dashboard
+    if (userData.role === 'Manager') {
+        throw redirect(303, '/manager/reports');
+    }
+
+    // Kick out deactivated users immediately — even if they are already logged in
+    if (userData.status === 'Inactive') {
         cookies.delete('user_id', { path: '/' });
         throw redirect(303, '/login');
     }

@@ -19,6 +19,13 @@ export const actions = {
             });
         }
 
+        // 2.1 Status Check: Block Deactivated users
+        if (user.status === 'Inactive') {
+            return fail(401, {
+                error: 'Your account has been deactivated. Please contact your administrator.'
+            });
+        }
+
         // 3. Set the Session Cookie
         cookies.set('user_id', user.id.toString(), {
             path: '/',

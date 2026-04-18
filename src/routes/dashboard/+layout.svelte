@@ -113,7 +113,7 @@
 			</a>
 			<form
 				method="POST"
-				action="/dashboard?/logout"
+				action="/logout"
 				onsubmit={async (e) => {
 					if (timer.status === "working") {
 						e.preventDefault();

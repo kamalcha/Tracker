@@ -27,6 +27,10 @@ export const invitations = pgTable('invitations', {
     organizationId: integer('organization_id')
         .notNull()
         .references(() => organizations.id),
+    status: text('status')
+        .$type<'Sent' | 'Expired' | 'Revoked' | 'Joined'>()
+        .default('Sent')
+        .notNull(),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

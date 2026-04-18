@@ -9,8 +9,10 @@ export const load = async ({ url }) => {
     // 1. If there's a token, find the specific invitation
     if (token) {
         const [invitation] = await db.select({
+            token: invitations.token,
             email: invitations.email,
             organizationId: invitations.organizationId,
+            status: invitations.status,
             organizationName: organizations.name,
             expiresAt: invitations.expiresAt
         })
@@ -18,9 +20,10 @@ export const load = async ({ url }) => {
             .innerJoin(organizations, eq(invitations.organizationId, organizations.id))
             .where(eq(invitations.token, token));
 
-        // Security Check: Does the token exist and is it still valid?
-        if (!invitation || new Date() > invitation.expiresAt) {
-            return { error: "This invitation has expired or is invalid." };
+        // Security Check: token must exist AND still be in 'Sent' status
+        // Expired and Revoked tokens are rejected. Records are deleted after registration so missing = already used.
+        if (!invitation || invitation.status !== 'Sent' || new Date() > invitation.expiresAt) {
+            return { error: "This invitation link is invalid, expired, or has already been used." };
         }
 
         return { invitation };
@@ -50,9 +53,12 @@ export const actions = {
             status: 'Active'
         }).returning({ id: users.id });
 
-        // IMPORTANT: Cleanup. If they used a token, delete it so it can't be reused.
+        // Delete the invitation record — the user is now in the users table.
+        // Non-existence is the new invalidation mechanism (simpler and cleaner).
         if (token) {
-            await db.delete(invitations).where(eq(invitations.token, token));
+            await db
+                .delete(invitations)
+                .where(eq(invitations.token, token));
         }
 
         // Auto-login: Set the session cookie immediately

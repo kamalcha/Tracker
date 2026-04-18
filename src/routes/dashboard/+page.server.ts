@@ -6,10 +6,4 @@ export const load = async () => {
     throw redirect(303, '/dashboard/timer');
 };
 
-export const actions = {
-    logout: async ({ cookies }) => {
-        // Clear the session and redirect 
-        cookies.delete('user_id', { path: '/' });
-        throw redirect(303, '/login');
-    }
-};
+export const actions = {};

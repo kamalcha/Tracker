@@ -37,6 +37,7 @@
 	"dependencies": {
 		"drizzle-orm": "^0.45.2",
 		"lucide-svelte": "^1.0.1",
-		"pg": "^8.20.0"
+		"pg": "^8.20.0",
+		"resend": "^6.12.0"
 	}
 }
