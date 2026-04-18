@@ -54,6 +54,12 @@
 	let activeProjectDropdown = $state<number | null>(null);
 	let projectSearch = $state("");
 	let newProjectName = $state("");
+	let projectsList = $state(data.projects);
+
+	// Keep local project list in sync when server data changes (e.g. navigation)
+	$effect(() => {
+		projectsList = data.projects;
+	});
 
 	let totalEditSeconds = $derived(editH * 3600 + editM * 60);
 	let isOverLimit = $derived(totalEditSeconds > 86400);
@@ -72,7 +78,7 @@
 
 	// Filtered Projects for Dropdown
 	let filteredProjects = $derived(
-		data.projects.filter(
+		projectsList.filter(
 			(p) =>
 				!p.isArchived &&
 				p.name.toLowerCase().includes(projectSearch.toLowerCase()),
@@ -451,10 +457,12 @@
 														return async ({ result }) => {
 															if (result.type === "success" && result.data) {
 																const { newProject } = result.data as any;
+																projectsList = [...projectsList, newProject];
 																task.projectName = newProject.name;
 																task.projectId = newProject.id;
 																newProjectName = "";
 																activeProjectDropdown = null;
+																await invalidateAll();
 															}
 														};
 													}}
