@@ -66,5 +66,43 @@ export const actions = {
             await tx.delete(projects).where(eq(projects.id, id));
         });
         return { success: true };
+    },
+
+    archiveProjects: async ({ request }) => {
+        const data = await request.formData();
+        const ids: number[] = JSON.parse(data.get('ids')?.toString() || '[]');
+        const archive = data.get('archive') === 'true';
+
+        await db.transaction(async (tx) => {
+            for (const id of ids) {
+                await tx.update(projects).set({ isArchived: archive }).where(eq(projects.id, id));
+                if (archive) {
+                    await tx.update(tasks).set({
+                        isArchived: true,
+                        status: 'Done',
+                        completed: true
+                    }).where(eq(tasks.projectId, id));
+                } else {
+                    await tx.update(tasks).set({
+                        isArchived: false,
+                        status: 'Todo',
+                        completed: false
+                    }).where(eq(tasks.projectId, id));
+                }
+            }
+        });
+        return { success: true };
+    },
+
+    deleteProjects: async ({ request }) => {
+        const data = await request.formData();
+        const ids: number[] = JSON.parse(data.get('ids')?.toString() || '[]');
+        await db.transaction(async (tx) => {
+            for (const id of ids) {
+                await tx.delete(tasks).where(eq(tasks.projectId, id));
+                await tx.delete(projects).where(eq(projects.id, id));
+            }
+        });
+        return { success: true };
     }
 };
