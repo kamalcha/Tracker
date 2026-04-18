@@ -33,7 +33,7 @@
 	}
 </script>
 
-<div class="flex flex-col h-screen bg-white overflow-hidden">
+<div class="flex flex-col h-full bg-white overflow-hidden">
 	<header class="px-8 pt-8 flex gap-8 border-b border-zinc-100 shrink-0">
 		{#each ["Active", "Archive"] as tab}
 			<button
@@ -179,31 +179,31 @@
 						</td>
 					</tr>
 				{/each}
-				{#if currentTab === "Active"}
-					<tr class="bg-zinc-50/10">
-						<td colspan="3" class="px-8">
-							<form
-								action="?/createProject"
-								method="POST"
-								use:enhance={() => {
-									return async ({ update }) => {
-										await update();
-										newProjectName = "";
-									};
-								}}
-							>
-								<input
-									bind:value={newProjectName}
-									name="name"
-									placeholder="Add new project... (Enter)"
-									class="w-full py-4 bg-transparent font-bold outline-none placeholder:text-zinc-200"
-								/>
-							</form>
-						</td>
-					</tr>
-				{/if}
 			</tbody>
 		</table>
+		{#if currentTab === "Active"}
+			<div
+				class="sticky bottom-0 bg-white border-t border-zinc-100 px-8 z-10"
+			>
+				<form
+					action="?/createProject"
+					method="POST"
+					use:enhance={() => {
+						return async ({ update }) => {
+							await update();
+							newProjectName = "";
+						};
+					}}
+				>
+					<input
+						bind:value={newProjectName}
+						name="name"
+						placeholder="Add new project... (Enter)"
+						class="w-full py-4 bg-transparent font-bold outline-none placeholder:text-zinc-200"
+					/>
+				</form>
+			</div>
+		{/if}
 	</div>
 
 	{#if toastVisible}

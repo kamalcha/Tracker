@@ -80,10 +80,9 @@
 		toastVisible = true;
 		toastTimer = setTimeout(() => (toastVisible = false), 6000);
 	}
-
 </script>
 
-<div class="flex flex-col h-screen bg-white overflow-hidden">
+<div class="flex flex-col h-full bg-white overflow-hidden">
 	<header class="px-8 pt-8 flex gap-8 border-b border-zinc-100 shrink-0">
 		{#each ["Inbox", "Archive"] as tab}
 			<button
@@ -242,7 +241,10 @@
 							{:else}
 								<div
 									class="relative"
-									use:clickOutside={() => { if (activeProjectDropdown === task.id) activeProjectDropdown = null; }}
+									use:clickOutside={() => {
+										if (activeProjectDropdown === task.id)
+											activeProjectDropdown = null;
+									}}
 								>
 									<button
 										onclick={() =>
@@ -421,7 +423,10 @@
 							{:else}
 								<div
 									class="relative"
-									use:clickOutside={() => { if (activeStatusDropdown === task.id) activeStatusDropdown = null; }}
+									use:clickOutside={() => {
+										if (activeStatusDropdown === task.id)
+											activeStatusDropdown = null;
+									}}
 								>
 									<button
 										onclick={() =>
@@ -546,32 +551,31 @@
 						</td>
 					</tr>
 				{/each}
-
-				{#if !isArchiveTab}
-					<tr class="bg-zinc-50/10"
-						><td class="py-4 px-6"></td><td colspan="4" class="px-4"
-							><form
-								action="?/createTask"
-								method="POST"
-								use:enhance={() => {
-									return async ({ update }) => {
-										await update();
-										newTaskName = "";
-									};
-								}}
-							>
-								<input
-									bind:value={newTaskName}
-									name="name"
-									placeholder="Quick add task... (Enter)"
-									class="w-full bg-transparent font-bold outline-none placeholder:text-zinc-200"
-								/>
-							</form></td
-						></tr
-					>
-				{/if}
 			</tbody>
 		</table>
+		{#if !isArchiveTab}
+			<div
+				class="sticky bottom-0 bg-white border-t border-zinc-100 px-8 z-10"
+			>
+				<form
+					action="?/createTask"
+					method="POST"
+					use:enhance={() => {
+						return async ({ update }) => {
+							await update();
+							newTaskName = "";
+						};
+					}}
+				>
+					<input
+						bind:value={newTaskName}
+						name="name"
+						placeholder="Quick add task... (Enter)"
+						class="w-full py-4 bg-transparent font-bold outline-none placeholder:text-zinc-200"
+					/>
+				</form>
+			</div>
+		{/if}
 	</div>
 
 	{#if selectedIds.length > 0}
