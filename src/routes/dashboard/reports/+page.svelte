@@ -37,7 +37,7 @@
 		if (decimalValue === 0) return "0h";
 
 		const hours = Math.floor(decimalValue);
-		const minutes = Math.round((decimalValue - hours) * 60);
+		const minutes = Math.floor((decimalValue - hours) * 60);
 
 		let formatted = "";
 		if (hours > 0) formatted += `${hours}h`;
