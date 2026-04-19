@@ -213,7 +213,7 @@
 								>
 							{:else if item.displayStatus === "Inactive"}
 								<span
-									class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-50 text-red-600 border border-red-100"
+									class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-red-50 text-red-600 border border-dashed border-red-100"
 									>Inactive</span
 								>
 							{/if}
